@@ -1,6 +1,6 @@
 --[[ 
     Script: 7yd7 | Roda Radial de Emotes
-    Ajustes: Trava de rolagem no modal, botão X limpo, alinhamento de ícones e centralização de textos.
+    Correções reais: Trava do ScrollingFrame, tamanho das categorias e abaixamento do modal.
 ]]
 
 local Players = game:GetService("Players")
@@ -33,6 +33,7 @@ local ID_ICONE_SOL = "rbxassetid://77667780640343"
 local ID_SIMBOLO_MAIS = "rbxassetid://85682941433471"
 local ID_SIMBOLO_LIXEIRA = "rbxassetid://78774633521849"
 local ID_CARTUCHO_SALVAR = "rbxassetid://103168629250780"
+local ID_FECHAR_X = "rbxassetid://78774633521849" -- ID do X atualizado
 
 local ID_SETA_ESQUERDA = "rbxassetid://112363067871003"
 local ID_SETA_DIREITA = "rbxassetid://138794689086376"
@@ -289,7 +290,6 @@ sideStroke.Color = Color3.fromRGB(255, 255, 255)
 sideStroke.Thickness = 2
 sidePanel.ClipsDescendants = true 
 
--- Header Centralizado
 local sideHeader = Instance.new("Frame")
 sideHeader.Size = UDim2.new(1, 0, 0, 40)
 sideHeader.BackgroundTransparency = 1
@@ -315,9 +315,10 @@ sideTitle.Font = Enum.Font.Arcade
 sideTitle.TextXAlignment = Enum.TextXAlignment.Left
 sideTitle.Parent = sideHeader
 
--- ScrollingFrame Travado
+-- Correção real da obstrução: Tamanho fixo em pixels!
+-- 230 de altura total - 40 do header - 48 da área dos botões (24+24) = 142
 local sideScrolling = Instance.new("ScrollingFrame")
-sideScrolling.Size = UDim2.new(1, -8, 1, -100) 
+sideScrolling.Size = UDim2.new(1, -8, 0, 142) 
 sideScrolling.Position = UDim2.new(0, 4, 0, 42)
 sideScrolling.BackgroundTransparency = 1
 sideScrolling.ScrollBarThickness = 2
@@ -394,11 +395,11 @@ docButton.MouseButton1Click:Connect(function() sidePanel.Visible = not sidePanel
 local function promptRenameCategory(oldName, btn)
     local textBox = Instance.new("TextBox")
     textBox.Size = UDim2.new(1, -35, 1, 0)
-    textBox.Position = UDim2.new(0, 28, 0, 0)
+    textBox.Position = UDim2.new(0, 24, 0, 0)
     textBox.BackgroundTransparency = 1
     textBox.Text = oldName
     textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    textBox.TextSize = 10
+    textBox.TextSize = 9
     textBox.Font = Enum.Font.Arcade
     textBox.ClearTextOnFocus = false
     textBox.Parent = btn
@@ -466,16 +467,13 @@ modalHeader.BackgroundTransparency = 1
 modalHeader.ZIndex = 11
 modalHeader.Parent = saveModal
 
--- Botão X (Limpo)
-local closeModalBtn = Instance.new("TextButton")
+-- Botão X (Atualizado com o ID que você passou)
+local closeModalBtn = Instance.new("ImageButton")
 closeModalBtn.Size = UDim2.fromOffset(20, 20)
 closeModalBtn.AnchorPoint = Vector2.new(1, 0.5)
 closeModalBtn.Position = UDim2.new(1, -8, 0, 16)
 closeModalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-closeModalBtn.Text = "X"
-closeModalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeModalBtn.TextSize = 12
-closeModalBtn.Font = Enum.Font.Arcade
+closeModalBtn.Image = ID_FECHAR_X
 closeModalBtn.ZIndex = 11
 closeModalBtn.Parent = modalHeader
 Instance.new("UICorner", closeModalBtn).CornerRadius = UDim.new(0, 4)
@@ -509,16 +507,16 @@ modalSubtitle.Position = UDim2.new(0, 10, 0, 35)
 modalSubtitle.BackgroundTransparency = 1
 modalSubtitle.Text = "Escolha uma categoria para salvar o emote:"
 modalSubtitle.TextColor3 = Color3.fromRGB(200, 200, 200)
-modalSubtitle.TextSize = 10
+modalSubtitle.TextSize = 9 
 modalSubtitle.Font = Enum.Font.Arcade
 modalSubtitle.TextXAlignment = Enum.TextXAlignment.Left
 modalSubtitle.ZIndex = 11
 modalSubtitle.Parent = saveModal
 
--- ScrollingFrame do Modal travado e ajustado
+-- Informações ABAIXADAS: Y mudou de 55 para 65
 local modalScrolling = Instance.new("ScrollingFrame")
-modalScrolling.Size = UDim2.new(1, -20, 0, 75)
-modalScrolling.Position = UDim2.new(0, 10, 0, 55)
+modalScrolling.Size = UDim2.new(1, -20, 0, 65)
+modalScrolling.Position = UDim2.new(0, 10, 0, 65) -- Abaixado exatamente como pedido
 modalScrolling.BackgroundTransparency = 1
 modalScrolling.ScrollBarThickness = 2
 modalScrolling.ZIndex = 11
@@ -535,7 +533,7 @@ openSaveModal = function()
     
     for _, cat in ipairs(emoteData.categories) do
         local catBtn = Instance.new("TextButton")
-        catBtn.Size = UDim2.new(1, -4, 0, 28)
+        catBtn.Size = UDim2.new(1, -4, 0, 24) -- Mesmo tamanho padrão
         catBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
         catBtn.Text = ""
         catBtn.ZIndex = 12
@@ -544,7 +542,7 @@ openSaveModal = function()
         local cs = Instance.new("UIStroke", catBtn); cs.Color = Color3.fromRGB(200,200,200); cs.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         
         local catSun = Instance.new("ImageLabel")
-        catSun.Size = UDim2.fromOffset(14, 14)
+        catSun.Size = UDim2.fromOffset(12, 12)
         catSun.Position = UDim2.new(0, 8, 0.5, 0)
         catSun.AnchorPoint = Vector2.new(0, 0.5)
         catSun.BackgroundTransparency = 1
@@ -554,11 +552,11 @@ openSaveModal = function()
 
         local catText = Instance.new("TextLabel")
         catText.Size = UDim2.new(1, -40, 1, 0)
-        catText.Position = UDim2.new(0, 28, 0, 0)
+        catText.Position = UDim2.new(0, 24, 0, 0)
         catText.BackgroundTransparency = 1
         catText.Text = cat.name
         catText.TextColor3 = Color3.fromRGB(255, 255, 255)
-        catText.TextSize = 10
+        catText.TextSize = 9
         catText.Font = Enum.Font.Arcade
         catText.TextXAlignment = Enum.TextXAlignment.Left
         catText.ZIndex = 12
@@ -589,7 +587,6 @@ openSaveModal = function()
     saveModal.Visible = true
 end
 
--- Botão Salvar Centralizado
 local saveConfirmBtn = Instance.new("TextButton")
 saveConfirmBtn.Size = UDim2.new(1, -20, 0, 30)
 saveConfirmBtn.Position = UDim2.new(0, 10, 1, -40)
@@ -856,7 +853,7 @@ buildCategoriesMenu = function()
     
     local function createCatBtn(name, count)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -8, 0, 34)
+        btn.Size = UDim2.new(1, -8, 0, 24) -- TAMANHO IGUAL AOS BOTÕES DE CRIAR/REMOVER
         btn.BackgroundColor3 = (currentCategory == name) and Color3.fromRGB(35, 35, 35) or Color3.fromRGB(0, 0, 0)
         btn.Text = ""
         btn.Parent = sideScrolling
@@ -868,7 +865,7 @@ buildCategoriesMenu = function()
         stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
         local icon = Instance.new("ImageLabel")
-        icon.Size = UDim2.fromOffset(14, 14)
+        icon.Size = UDim2.fromOffset(10, 10)
         icon.Position = UDim2.new(0, 8, 0.5, 0)
         icon.AnchorPoint = Vector2.new(0, 0.5)
         icon.BackgroundTransparency = 1
@@ -878,18 +875,18 @@ buildCategoriesMenu = function()
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, -40, 1, 0)
-        label.Position = UDim2.new(0, 28, 0, 0)
+        label.Position = UDim2.new(0, 24, 0, 0)
         label.BackgroundTransparency = 1
         label.Text = name
         label.TextColor3 = (currentCategory == name) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-        label.TextSize = 10
+        label.TextSize = 9
         label.Font = Enum.Font.Arcade
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = btn
 
         local arrow = Instance.new("TextLabel")
         arrow.Size = UDim2.new(0, 10, 1, 0)
-        arrow.Position = UDim2.new(1, -18, 0, 0)
+        arrow.Position = UDim2.new(1, -15, 0, 0)
         arrow.BackgroundTransparency = 1
         arrow.Text = ">"
         arrow.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -921,4 +918,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Interface ajustada e polida com sucesso.")
+print("✅ Tamanhos e posições ajustados.")
