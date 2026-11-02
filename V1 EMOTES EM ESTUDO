@@ -1,5 +1,5 @@
 --[[ 
-    Script: 7yd7 | Roda Radial de Emotes (Espaçamiento das Setas Ajustado, ID do Cartucho Atualizado e Layout Perfeito)
+    Script: 7yd7 | Roda Radial de Emotes (Ajuste Definitivo da Seta Direita para Fora +30px)
 ]]
 
 local Players = game:GetService("Players")
@@ -21,7 +21,7 @@ end)
 
 local Settings = { Speed = 1, StopOnMove = true }
 
--- IDs fornecidos (cartucho atualizado)
+-- IDs fornecidos
 local ID_CARTUCHO_BORDA = "rbxassetid://96618641654782"
 local ID_CARTUCHO_SEMBORDA = "rbxassetid://96618641654782"
 local ID_BTN_DOCUMENTO = "rbxassetid://76204370315940"
@@ -96,7 +96,7 @@ if not success or not parentTarget then
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EmoteRadialGui_7yd7_FinalArrows"
+screenGui.Name = "EmoteRadialGui_7yd7_RightArrowOut"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentTarget
 
@@ -212,7 +212,7 @@ searchBox.Font = Enum.Font.Arcade
 searchBox.ClearTextOnFocus = false
 searchBox.Parent = searchContainer
 
--- Botão Cartucho Puro (Com o novo ID solicitado)
+-- Botão Cartucho Puro
 local cartridgeButton = Instance.new("ImageButton")
 cartridgeButton.Size = UDim2.new(0, 32, 0, 32)
 cartridgeButton.Position = UDim2.new(1, -32, 0, 2)
@@ -227,23 +227,23 @@ cartridgeButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Rodapé de Paginação Ajustado (Setas perfeitamente espaçadas da numeração central)
+-- Rodapé de Paginação Ajustado (Seta esquerda próxima ao 1 e seta direita corretamente afastada para fora +30px)
 local navContainer = Instance.new("Frame")
-navContainer.Size = UDim2.new(0, 220, 0, 30)
+navContainer.Size = UDim2.new(0, 280, 0, 30)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
 navContainer.Position = UDim2.new(0.5, 0, 1, 10)
 navContainer.BackgroundTransparency = 1
 navContainer.Parent = wheelFrame
 
 local prevButton = Instance.new("ImageButton")
-prevButton.Size = UDim2.new(0, 24, 0, 24)
-prevButton.Position = UDim2.new(0, 15, 0, 3)
+prevButton.Size = UDim2.new(0, 22, 0, 22)
+prevButton.Position = UDim2.new(0, 73, 0, 4) -- Seta esquerda mantida próxima
 prevButton.BackgroundTransparency = 1
 prevButton.Image = ID_SETA_ESQUERDA
 prevButton.Parent = navContainer
 
 local pageTextBox = Instance.new("TextBox")
-pageTextBox.Size = UDim2.new(0, 35, 1, 0)
+pageTextBox.Size = UDim2.new(0, 32, 1, 0)
 pageTextBox.Position = UDim2.new(0.35, 0, 0, 0)
 pageTextBox.BackgroundTransparency = 1
 pageTextBox.Text = tostring(currentPage)
@@ -254,8 +254,8 @@ pageTextBox.ClearTextOnFocus = false
 pageTextBox.Parent = navContainer
 
 local pageInfoLabel = Instance.new("TextLabel")
-pageInfoLabel.Size = UDim2.new(0, 70, 1, 0)
-pageInfoLabel.Position = UDim2.new(0.52, 0, 0, 0)
+pageInfoLabel.Size = UDim2.new(0, 65, 1, 0)
+pageInfoLabel.Position = UDim2.new(0.51, 0, 0, 0)
 pageInfoLabel.BackgroundTransparency = 1
 pageInfoLabel.Text = "------   " .. totalPages
 pageInfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -265,8 +265,8 @@ pageInfoLabel.Font = Enum.Font.Arcade
 pageInfoLabel.Parent = navContainer
 
 local nextButton = Instance.new("ImageButton")
-nextButton.Size = UDim2.new(0, 24, 0, 24)
-nextButton.Position = UDim2.new(1, -39, 0, 3)
+nextButton.Size = UDim2.new(0, 22, 0, 22)
+nextButton.Position = UDim2.new(1, -32, 0, 4) -- Seta direita afastada corretamente para fora (+30 pixels)
 nextButton.BackgroundTransparency = 1
 nextButton.Image = ID_SETA_DIREITA
 nextButton.Parent = navContainer
@@ -744,4 +744,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Script atualizado com setas perfeitamente espaçadas e ID do cartucho corrigido!")
+print("✅ Seta direita devidamente afastada para fora e interface pronta!")
