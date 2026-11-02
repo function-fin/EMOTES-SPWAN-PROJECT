@@ -1,5 +1,5 @@
 --[[ 
-    Script: 7yd7 | Roda Radial de Emotes (Barra Inferior Unificada com Layout Automático e Perfeitamente Centralizada)
+    Script: 7yd7 | Roda Radial de Emotes (Seta Direita Ajustada e Contorno Radial de Seleção de Emote)
 ]]
 
 local Players = game:GetService("Players")
@@ -96,7 +96,7 @@ if not success or not parentTarget then
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EmoteRadialGui_7yd7_UnifiedNav"
+screenGui.Name = "EmoteRadialGui_7yd7_SelectionIndicator"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentTarget
 
@@ -158,6 +158,7 @@ local selectedEmoteItem = nil
 local catalogItems = {}
 local slotButtons = {}
 local slotImages = {}
+local selectionIndicators = {} -- Indicadores visuais de seleção por slot
 
 local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
 
@@ -227,9 +228,9 @@ cartridgeButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Barra de Navegação Inferior Unificada e Centralizada com UIListLayout
+-- Barra de Navegação Inferior Unificada com espaçamento perfeito para a seta direita não encostar no número[span_2](start_span)[span_2](end_span)
 local navContainer = Instance.new("Frame")
-navContainer.Size = UDim2.new(0, 240, 0, 30)
+navContainer.Size = UDim2.new(0, 270, 0, 30)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
 navContainer.Position = UDim2.new(0.5, 0, 1, 10)
 navContainer.BackgroundTransparency = 1
@@ -240,7 +241,7 @@ navLayout.FillDirection = Enum.FillDirection.Horizontal
 navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 navLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 navLayout.SortOrder = Enum.SortOrder.LayoutOrder
-navLayout.Padding = UDim.new(0, 12)
+navLayout.Padding = UDim.new(0, 16) -- Espaçamento ampliado para afastar a seta direita do número[span_3](start_span)[span_3](end_span)
 navLayout.Parent = navContainer
 
 local prevButton = Instance.new("ImageButton")
@@ -568,6 +569,10 @@ updateWheelSlots = function()
         local item = catalogItems[i]
         local btn = slotButtons[i]
         local img = slotImages[i]
+        local indicator = selectionIndicators[i]
+        
+        -- Oculta o indicador ao atualizar/mudar de página
+        indicator.Visible = false
         
         if item then
             btn.Text = "" 
@@ -659,6 +664,21 @@ for i = 1, TOTAL_SLOTS do
     slotButton.ZIndex = 6
     slotButton.Parent = wheelFrame
 
+    -- Indicador visual de seleção radial para o emote clicado
+    local selectionIndicator = Instance.new("Frame")
+    selectionIndicator.Size = UDim2.new(1, 6, 1, 6)
+    selectionIndicator.AnchorPoint = Vector2.new(0.5, 0.5)
+    selectionIndicator.Position = UDim2.new(0.5, 0, 0.5, 0)
+    selectionIndicator.BackgroundTransparency = 1
+    selectionIndicator.Visible = false
+    selectionIndicator.ZIndex = 5
+    selectionIndicator.Parent = slotButton
+    Instance.new("UICorner", selectionIndicator).CornerRadius = UDim.new(0.5, 0)
+    local indStroke = Instance.new("UIStroke")
+    indStroke.Color = Color3.fromRGB(255, 255, 255)
+    indStroke.Thickness = 2
+    indStroke.Parent = selectionIndicator
+
     local slotImg = Instance.new("ImageLabel")
     slotImg.Size = UDim2.new(1, 0, 1, 0)
     slotImg.BackgroundTransparency = 1
@@ -669,6 +689,12 @@ for i = 1, TOTAL_SLOTS do
     slotButton.MouseButton1Click:Connect(function()
         local item = catalogItems[i]
         if item then
+            -- Ativa o indicador de seleção apenas no slot clicado e oculta nos outros
+            for _, ind in pairs(selectionIndicators) do
+                ind.Visible = false
+            end
+            selectionIndicator.Visible = true
+
             selectedEmoteItem = item
             centerText.Text = item.Name or "Emote"
             cartridgeButton.Visible = true
@@ -678,6 +704,7 @@ for i = 1, TOTAL_SLOTS do
     
     slotButtons[i] = slotButton
     slotImages[i] = slotImg
+    selectionIndicators[i] = selectionIndicator
 end
 
 prevButton.MouseButton1Click:Connect(function()
@@ -752,4 +779,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Barra de navegação unificada com UIListLayout e perfeitamente centralizada!")
+print("✅ Seta direita devidamente afastada e contorno de seleção implementado com sucesso!")
