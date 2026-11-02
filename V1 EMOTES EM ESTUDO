@@ -1,5 +1,5 @@
 --[[ 
-    Script: 7yd7 | Roda Radial de Emotes (Layout Corrigido, Bordas nos Botões, Paginação Alinhada)
+    Script: 7yd7 | Roda Radial de Emotes (Layout Ajustado, Espaçamento de Paginação Corrigido, IDs de Setas e B&W)
 ]]
 
 local Players = game:GetService("Players")
@@ -96,7 +96,7 @@ if not success or not parentTarget then
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EmoteRadialGui_7yd7_FinalLayout"
+screenGui.Name = "EmoteRadialGui_7yd7_PerfectSpacing"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentTarget
 
@@ -177,15 +177,12 @@ docButton.BackgroundTransparency = 1
 docButton.Image = ID_BTN_DOCUMENTO
 docButton.Parent = topBar
 
--- Correção: Container de Pesquisa com Borda no Botão (Fundo Preto + Borda Branca)
 local searchContainer = Instance.new("Frame")
 searchContainer.Size = UDim2.new(0, 260, 0, 38)
 searchContainer.Position = UDim2.new(0, 52, 0, 2)
 searchContainer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 searchContainer.Parent = topBar
 Instance.new("UICorner", searchContainer).CornerRadius = UDim.new(0, 20)
-
--- Correção: Borda branca aplicada ao container, não ao texto
 local searchStroke = Instance.new("UIStroke")
 searchStroke.Color = Color3.fromRGB(255, 255, 255)
 searchStroke.Thickness = 2
@@ -227,8 +224,6 @@ sidePanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 sidePanel.Visible = false
 sidePanel.Parent = mainContainer
 Instance.new("UICorner", sidePanel).CornerRadius = UDim.new(0, 8)
-
--- Correção: Borda Branca do Painel Lateral (já estava correta)
 local sideStroke = Instance.new("UIStroke")
 sideStroke.Color = Color3.fromRGB(255, 255, 255)
 sideStroke.Thickness = 2
@@ -269,7 +264,6 @@ sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
 sideLayout.Padding = UDim.new(0, 5)
 sideLayout.Parent = sideScrolling
 
--- Correção: Botões de Criar/Remover Categoria com Borda no Botão (Não no Texto)
 local createCatGlobalBtn = Instance.new("TextButton")
 createCatGlobalBtn.Size = UDim2.new(1, -10, 0, 26)
 createCatGlobalBtn.Position = UDim2.new(0, 5, 1, -58)
@@ -280,9 +274,7 @@ createCatGlobalBtn.TextSize = 10
 createCatGlobalBtn.Font = Enum.Font.Arcade
 createCatGlobalBtn.Parent = sidePanel
 Instance.new("UICorner", createCatGlobalBtn).CornerRadius = UDim.new(0, 4)
-local createStroke = Instance.new("UIStroke", createCatGlobalBtn)
-createStroke.Color = Color3.fromRGB(255, 255, 255)
-createStroke.Thickness = 1.5
+Instance.new("UIStroke", createCatGlobalBtn).Color = Color3.fromRGB(255, 255, 255)
 
 local removeCatGlobalBtn = Instance.new("TextButton")
 removeCatGlobalBtn.Size = UDim2.new(1, -10, 0, 26)
@@ -294,9 +286,7 @@ removeCatGlobalBtn.TextSize = 10
 removeCatGlobalBtn.Font = Enum.Font.Arcade
 removeCatGlobalBtn.Parent = sidePanel
 Instance.new("UICorner", removeCatGlobalBtn).CornerRadius = UDim.new(0, 4)
-local removeStroke = Instance.new("UIStroke", removeCatGlobalBtn)
-removeStroke.Color = Color3.fromRGB(255, 255, 255)
-removeStroke.Thickness = 1.5
+Instance.new("UIStroke", removeCatGlobalBtn).Color = Color3.fromRGB(255, 255, 255)
 
 docButton.MouseButton1Click:Connect(function()
     sidePanel.Visible = not sidePanel.Visible
@@ -369,9 +359,7 @@ closeModalBtn.Font = Enum.Font.Arcade
 closeModalBtn.ZIndex = 11
 closeModalBtn.Parent = modalHeader
 Instance.new("UICorner", closeModalBtn).CornerRadius = UDim.new(0, 4)
-local closeStroke = Instance.new("UIStroke", closeModalBtn)
-closeStroke.Color = Color3.fromRGB(255, 255, 255)
-closeStroke.Thickness = 1.5
+Instance.new("UIStroke", closeModalBtn).Color = Color3.fromRGB(255, 255, 255)
 
 closeModalBtn.MouseButton1Click:Connect(function()
     saveModal.Visible = false
@@ -421,9 +409,7 @@ openSaveModal = function()
         catBtn.ZIndex = 12
         catBtn.Parent = modalScrolling
         Instance.new("UICorner", catBtn).CornerRadius = UDim.new(0, 6)
-        local catBtnStroke = Instance.new("UIStroke", catBtn)
-        catBtnStroke.Color = Color3.fromRGB(200, 200, 200)
-        catBtnStroke.Thickness = 1
+        Instance.new("UIStroke", catBtn).Color = Color3.fromRGB(200, 200, 200)
         
         catBtn.MouseButton1Click:Connect(function()
             targetCategoryToSave = cat.name
@@ -448,9 +434,7 @@ saveConfirmBtn.Font = Enum.Font.Arcade
 saveConfirmBtn.ZIndex = 11
 saveConfirmBtn.Parent = saveModal
 Instance.new("UICorner", saveConfirmBtn).CornerRadius = UDim.new(0, 6)
-local saveConfirmStroke = Instance.new("UIStroke", saveConfirmBtn)
-saveConfirmStroke.Color = Color3.fromRGB(255, 255, 255)
-saveConfirmStroke.Thickness = 2
+Instance.new("UIStroke", saveConfirmBtn).Color = Color3.fromRGB(255, 255, 255)
 
 saveConfirmBtn.MouseButton1Click:Connect(function()
     if selectedEmoteItem and targetCategoryToSave then
@@ -640,60 +624,50 @@ for i = 1, TOTAL_SLOTS do
     slotImages[i] = slotImg
 end
 
--- ==========================================
--- PARTE 2: PAGINAÇÃO INFERIOR E CATEGORIAS
--- ==========================================
-
--- Rodapé de Paginação Totalmente Reformulado (Baseado na Imagem 2)
+-- Rodapé de Paginação Ajustado (Espaçamento corrigido para evitar sobreposição das setas com a numeração)
 local navContainer = Instance.new("Frame")
-navContainer.Size = UDim2.new(0, 300, 0, 40)
+navContainer.Size = UDim2.new(0, 300, 0, 35)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
 navContainer.Position = UDim2.new(0.5, 0, 0.85, 0)
 navContainer.BackgroundTransparency = 1
 navContainer.Parent = mainContainer
 
--- Botão Seta Esquerda
 local prevButton = Instance.new("ImageButton")
 prevButton.Size = UDim2.new(0, 32, 0, 32)
-prevButton.Position = UDim2.new(0, 0, 0, 4)
+prevButton.Position = UDim2.new(0, 0, 0, 0)
 prevButton.BackgroundTransparency = 1
 prevButton.Image = ID_SETA_ESQUERDA
 prevButton.Parent = navContainer
 
--- TextBox da Página Atual (Centralizado)
 local pageTextBox = Instance.new("TextBox")
-pageTextBox.Size = UDim2.new(0, 50, 1, 0)
-pageTextBox.Position = UDim2.new(0.5, -50, 0, 0)
+pageTextBox.Size = UDim2.new(0, 45, 1, 0)
+pageTextBox.Position = UDim2.new(0.35, 0, 0, 0)
 pageTextBox.BackgroundTransparency = 1
 pageTextBox.Text = tostring(currentPage)
 pageTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-pageTextBox.TextSize = 16
+pageTextBox.TextSize = 14
 pageTextBox.Font = Enum.Font.Arcade
 pageTextBox.ClearTextOnFocus = false
-pageTextBox.TextXAlignment = Enum.TextXAlignment.Right
 pageTextBox.Parent = navContainer
 
--- Label com o Total de Páginas (Alinhado à direita do TextBox)
 local pageInfoLabel = Instance.new("TextLabel")
-pageInfoLabel.Size = UDim2.new(0, 80, 1, 0)
-pageInfoLabel.Position = UDim2.new(0.5, 5, 0, 0)
+pageInfoLabel.Size = UDim2.new(0, 100, 1, 0)
+pageInfoLabel.Position = UDim2.new(0.55, 0, 0, 0)
 pageInfoLabel.BackgroundTransparency = 1
-pageInfoLabel.Text = "------   " .. tostring(totalPages)
+pageInfoLabel.Text = "------   " .. totalPages
 pageInfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-pageInfoLabel.TextSize = 16
+pageInfoLabel.TextSize = 14
 pageInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
 pageInfoLabel.Font = Enum.Font.Arcade
 pageInfoLabel.Parent = navContainer
 
--- Botão Seta Direita
 local nextButton = Instance.new("ImageButton")
 nextButton.Size = UDim2.new(0, 32, 0, 32)
-nextButton.Position = UDim2.new(1, -32, 0, 4)
+nextButton.Position = UDim2.new(1, -32, 0, 0)
 nextButton.BackgroundTransparency = 1
 nextButton.Image = ID_SETA_DIREITA
 nextButton.Parent = navContainer
 
--- Lógica de Navegação
 prevButton.MouseButton1Click:Connect(function()
     if currentPage > 1 then
         currentPage = currentPage - 1
@@ -721,17 +695,12 @@ pageTextBox.FocusLost:Connect(function()
     end
 end)
 
--- Evento de Pesquisa
 searchBox.FocusLost:Connect(function()
     currentKeyword = searchBox.Text
     currentPage = 1
-    pageTextBox.Text = tostring(currentPage)
     loadPage(currentPage)
 end)
 
--- ==========================================
--- MENU DE CATEGORIAS (Bordas Corrigidas)
--- ==========================================
 buildCategoriesMenu = function()
     for _, child in ipairs(sideScrolling:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
@@ -747,40 +716,28 @@ buildCategoriesMenu = function()
         btn.Font = Enum.Font.Arcade
         btn.TextXAlignment = Enum.TextXAlignment.Left
         btn.Parent = sideScrolling
-        
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
-        
-        -- Correção: Borda aplicada ao Botão (UIStroke) e não ao texto
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(255, 255, 255)
-        stroke.Thickness = 1.5
-        stroke.Parent = btn
+        Instance.new("UIStroke", btn).Color = Color3.fromRGB(255, 255, 255)
         
         btn.MouseButton1Click:Connect(function()
             currentCategory = name
             currentPage = 1
-            pageTextBox.Text = tostring(currentPage)
             loadPage(currentPage)
             sidePanel.Visible = false
         end)
     end
     
-    -- Botão "Todos"
     createCatBtn("All", "Todos")
-    
-    -- Botão "Favoritos"
     local favCount = 0
     for _, _ in pairs(emoteData.favorites) do favCount = favCount + 1 end
     createCatBtn("Favoritos", favCount)
     
-    -- Botões de Categorias Personalizadas
     for _, cat in ipairs(emoteData.categories) do
         createCatBtn(cat.name, #cat.emotes)
     end
 end
 
--- Inicialização
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Roda Radial ajustada com sucesso! Layout, bordas e paginação corrigidos.")
+print("✅ Roda Radial ajustada com espaçamento perfeito de paginação e setas por ID livres!")
