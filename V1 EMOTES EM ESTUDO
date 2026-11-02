@@ -241,7 +241,7 @@ navLayout.FillDirection = Enum.FillDirection.Horizontal
 navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 navLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 navLayout.SortOrder = Enum.SortOrder.LayoutOrder
-navLayout.Padding = UDim.new(0, 22) -- Espaçamento calibrado para dar a mesma distância exata na seta direita e esquerda
+navLayout.Padding = UDim.new(0, 8) -- Espaçamento calibrado para dar a mesma distância exata na seta direita e esquerda
 navLayout.Parent = navContainer
 
 local prevButton = Instance.new("ImageButton")
@@ -265,7 +265,7 @@ pageTextBox.Parent = navContainer
 local pageInfoLabel = Instance.new("TextLabel")
 pageInfoLabel.Size = UDim2.new(0, 65, 0, 24)
 pageInfoLabel.BackgroundTransparency = 1
-pageInfoLabel.Text = "------   " .. totalPages
+pageInfoLabel.Text = "------" .. totalPages
 pageInfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 pageInfoLabel.TextSize = 12
 pageInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
