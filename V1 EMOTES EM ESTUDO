@@ -1,0 +1,743 @@
+--[[ 
+    Script: 7yd7 | Roda Radial de Emotes (Layout Ajustado, Espaçamento de Paginação Corrigido, IDs de Setas e B&W)
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local AvatarEditorService = game:GetService("AvatarEditorService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local lastPosition = character.PrimaryPart and character.PrimaryPart.Position or Vector3.new()
+
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    character = newCharacter
+    humanoid = newCharacter:WaitForChild("Humanoid")
+    lastPosition = character.PrimaryPart and character.PrimaryPart.Position or Vector3.new()
+end)
+
+local Settings = { Speed = 1, StopOnMove = true }
+
+-- IDs fornecidos
+local ID_CARTUCHO_BORDA = "rbxassetid://96618641654782"
+local ID_CARTUCHO_SEMBORDA = "rbxassetid://103168629250780"
+local ID_BTN_DOCUMENTO = "rbxassetid://76204370315940"
+local ID_BTN_EXTERNO = "rbxassetid://115103675836200"
+local ID_ICONE_SOL = "rbxassetid://78790652492224"
+local ID_SETA_ESQUERDA = "rbxassetid://112363067871003"
+local ID_SETA_DIREITA = "rbxassetid://138794689086376"
+
+-- Dados locais (zerados por padrão)
+local emoteData = {
+    favorites = {},
+    categories = {}
+}
+
+local CurrentTrack = nil
+local loopConnection
+
+local function LoadTrack(id)
+    if CurrentTrack then CurrentTrack:Stop(0.1) end
+    
+    local animId
+    local ok, result = pcall(function() return game:GetObjects("rbxassetid://" .. tostring(id)) end)
+    if ok and result and #result > 0 and result[1]:IsA("Animation") then
+        animId = result[1].AnimationId
+    else
+        animId = "rbxassetid://" .. tostring(id)
+    end
+    
+    local newAnim = Instance.new("Animation")
+    newAnim.AnimationId = animId
+    local newTrack = humanoid:LoadAnimation(newAnim)
+    newTrack.Priority = Enum.AnimationPriority.Action4
+    newTrack.Looped = true
+    
+    for _, t in pairs(humanoid.Animator:GetPlayingAnimationTracks()) do
+        if t.Priority ~= Enum.AnimationPriority.Action4 then t:Stop(0.1) end
+    end
+    
+    newTrack:Play(0.1, 1, Settings.Speed)
+    CurrentTrack = newTrack
+end
+
+loopConnection = RunService.RenderStepped:Connect(function()
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local root = character.HumanoidRootPart
+        if Settings.StopOnMove and CurrentTrack and CurrentTrack.IsPlaying then
+            local moved = (root.Position - lastPosition).Magnitude > 0.1
+            local jumped = humanoid and humanoid:GetState() == Enum.HumanoidStateType.Jumping
+            if moved or jumped then
+                CurrentTrack:Stop(0.1)
+                CurrentTrack = nil
+            end
+        end
+        lastPosition = root.Position
+    end
+end)
+
+local success, parentTarget = pcall(function()
+    if gethui then
+        return gethui()
+    elseif syn and syn.protect_gui then
+        local gui = Instance.new("ScreenGui")
+        syn.protect_gui(gui)
+        return gui
+    else
+        return CoreGui
+    end
+end)
+
+if not success or not parentTarget then
+    parentTarget = Players.LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "EmoteRadialGui_7yd7_PerfectSpacing"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = parentTarget
+
+-- Botão Externo Arrastável Puro
+local toggleButton = Instance.new("ImageButton")
+toggleButton.Name = "ToggleExternalButton"
+toggleButton.Size = UDim2.new(0, 48, 0, 48)
+toggleButton.Position = UDim2.new(0.85, 0, 0.75, 0)
+toggleButton.AnchorPoint = Vector2.new(0.5, 0.5)
+toggleButton.BackgroundTransparency = 1
+toggleButton.Image = ID_BTN_EXTERNO
+toggleButton.Parent = screenGui
+
+local dragging, dragInput, dragStart, startPos
+toggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = toggleButton.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+toggleButton.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        toggleButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Container Principal
+local mainContainer = Instance.new("Frame")
+mainContainer.Name = "MainContainer"
+mainContainer.Size = UDim2.new(1, 0, 1, 0)
+mainContainer.BackgroundTransparency = 1
+mainContainer.Visible = true
+mainContainer.Parent = screenGui
+
+toggleButton.MouseButton1Click:Connect(function()
+    mainContainer.Visible = not mainContainer.Visible
+end)
+
+-- Variáveis globais
+local currentCategory = "All"
+local currentPage = 1
+local totalPages = 4766
+local currentKeyword = ""
+local selectedEmoteItem = nil
+local catalogItems = {}
+local slotButtons = {}
+local slotImages = {}
+
+local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
+
+-- Barra Superior Organizada
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(0, 480, 0, 45)
+topBar.AnchorPoint = Vector2.new(0.5, 0)
+topBar.Position = UDim2.new(0.5, 0, 0.05, 0)
+topBar.BackgroundTransparency = 1
+topBar.Parent = mainContainer
+
+-- Botão Documento Puro
+local docButton = Instance.new("ImageButton")
+docButton.Size = UDim2.new(0, 42, 0, 42)
+docButton.Position = UDim2.new(0, 0, 0, 0)
+docButton.BackgroundTransparency = 1
+docButton.Image = ID_BTN_DOCUMENTO
+docButton.Parent = topBar
+
+local searchContainer = Instance.new("Frame")
+searchContainer.Size = UDim2.new(0, 260, 0, 38)
+searchContainer.Position = UDim2.new(0, 52, 0, 2)
+searchContainer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+searchContainer.Parent = topBar
+Instance.new("UICorner", searchContainer).CornerRadius = UDim.new(0, 20)
+local searchStroke = Instance.new("UIStroke")
+searchStroke.Color = Color3.fromRGB(255, 255, 255)
+searchStroke.Thickness = 2
+searchStroke.Parent = searchContainer
+
+local searchBox = Instance.new("TextBox")
+searchBox.Size = UDim2.new(1, -20, 1, 0)
+searchBox.Position = UDim2.new(0, 10, 0, 0)
+searchBox.BackgroundTransparency = 1
+searchBox.PlaceholderText = "Search/Emotes"
+searchBox.Text = ""
+searchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+searchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+searchBox.TextSize = 13
+searchBox.Font = Enum.Font.Arcade
+searchBox.ClearTextOnFocus = false
+searchBox.Parent = searchContainer
+
+-- Botão Cartucho Puro
+local cartridgeButton = Instance.new("ImageButton")
+cartridgeButton.Size = UDim2.new(0, 42, 0, 42)
+cartridgeButton.Position = UDim2.new(1, -42, 0, 0)
+cartridgeButton.BackgroundTransparency = 1
+cartridgeButton.Image = ID_CARTUCHO_SEMBORDA
+cartridgeButton.Visible = false
+cartridgeButton.Parent = topBar
+
+cartridgeButton.MouseButton1Click:Connect(function()
+    if selectedEmoteItem then
+        openSaveModal()
+    end
+end)
+
+-- Painel Lateral de Categorias
+local sidePanel = Instance.new("Frame")
+sidePanel.Size = UDim2.new(0, 185, 0, 310)
+sidePanel.Position = UDim2.new(0.25, 0, 0.22, 0)
+sidePanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+sidePanel.Visible = false
+sidePanel.Parent = mainContainer
+Instance.new("UICorner", sidePanel).CornerRadius = UDim.new(0, 8)
+local sideStroke = Instance.new("UIStroke")
+sideStroke.Color = Color3.fromRGB(255, 255, 255)
+sideStroke.Thickness = 2
+sideStroke.Parent = sidePanel
+
+local sideHeader = Instance.new("Frame")
+sideHeader.Size = UDim2.new(1, 0, 0, 40)
+sideHeader.BackgroundTransparency = 1
+sideHeader.Parent = sidePanel
+
+local sunIcon = Instance.new("ImageButton")
+sunIcon.Size = UDim2.new(0, 22, 0, 22)
+sunIcon.Position = UDim2.new(0, 12, 0, 9)
+sunIcon.BackgroundTransparency = 1
+sunIcon.Image = ID_ICONE_SOL
+sunIcon.Parent = sideHeader
+
+local sideTitle = Instance.new("TextLabel")
+sideTitle.Size = UDim2.new(1, -45, 1, 0)
+sideTitle.Position = UDim2.new(0, 40, 0, 0)
+sideTitle.BackgroundTransparency = 1
+sideTitle.Text = "Emotes"
+sideTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+sideTitle.TextSize = 15
+sideTitle.Font = Enum.Font.Arcade
+sideTitle.TextXAlignment = Enum.TextXAlignment.Left
+sideTitle.Parent = sideHeader
+
+local sideScrolling = Instance.new("ScrollingFrame")
+sideScrolling.Size = UDim2.new(1, -10, 1, -85)
+sideScrolling.Position = UDim2.new(0, 5, 0, 42)
+sideScrolling.BackgroundTransparency = 1
+sideScrolling.ScrollBarThickness = 2
+sideScrolling.Parent = sidePanel
+
+local sideLayout = Instance.new("UIListLayout")
+sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
+sideLayout.Padding = UDim.new(0, 5)
+sideLayout.Parent = sideScrolling
+
+local createCatGlobalBtn = Instance.new("TextButton")
+createCatGlobalBtn.Size = UDim2.new(1, -10, 0, 26)
+createCatGlobalBtn.Position = UDim2.new(0, 5, 1, -58)
+createCatGlobalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+createCatGlobalBtn.Text = "+ Criar Categoria"
+createCatGlobalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+createCatGlobalBtn.TextSize = 10
+createCatGlobalBtn.Font = Enum.Font.Arcade
+createCatGlobalBtn.Parent = sidePanel
+Instance.new("UICorner", createCatGlobalBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", createCatGlobalBtn).Color = Color3.fromRGB(255, 255, 255)
+
+local removeCatGlobalBtn = Instance.new("TextButton")
+removeCatGlobalBtn.Size = UDim2.new(1, -10, 0, 26)
+removeCatGlobalBtn.Position = UDim2.new(0, 5, 1, -28)
+removeCatGlobalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+removeCatGlobalBtn.Text = "Remover Categoria"
+removeCatGlobalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+removeCatGlobalBtn.TextSize = 10
+removeCatGlobalBtn.Font = Enum.Font.Arcade
+removeCatGlobalBtn.Parent = sidePanel
+Instance.new("UICorner", removeCatGlobalBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", removeCatGlobalBtn).Color = Color3.fromRGB(255, 255, 255)
+
+docButton.MouseButton1Click:Connect(function()
+    sidePanel.Visible = not sidePanel.Visible
+end)
+
+createCatGlobalBtn.MouseButton1Click:Connect(function()
+    local newName = "Categoria " .. (#emoteData.categories + 1)
+    table.insert(emoteData.categories, { name = newName, emotes = {} })
+    buildCategoriesMenu()
+end)
+
+removeCatGlobalBtn.MouseButton1Click:Connect(function()
+    if #emoteData.categories > 0 then
+        table.remove(emoteData.categories)
+        currentCategory = "All"
+        buildCategoriesMenu()
+        loadPage(1)
+    end
+end)
+
+-- Modal "Salvar em Categoria"
+local saveModal = Instance.new("Frame")
+saveModal.Size = UDim2.new(0, 360, 0, 220)
+saveModal.AnchorPoint = Vector2.new(0.5, 0.5)
+saveModal.Position = UDim2.new(0.5, 0, 0.5, 0)
+saveModal.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+saveModal.Visible = false
+saveModal.ZIndex = 10
+saveModal.Parent = mainContainer
+Instance.new("UICorner", saveModal).CornerRadius = UDim.new(0, 8)
+local modalStroke = Instance.new("UIStroke")
+modalStroke.Color = Color3.fromRGB(255, 255, 255)
+modalStroke.Thickness = 2
+modalStroke.Parent = saveModal
+
+local modalHeader = Instance.new("Frame")
+modalHeader.Size = UDim2.new(1, 0, 0, 40)
+modalHeader.BackgroundTransparency = 1
+modalHeader.ZIndex = 11
+modalHeader.Parent = saveModal
+
+local modalIcon = Instance.new("ImageLabel")
+modalIcon.Size = UDim2.new(0, 24, 0, 24)
+modalIcon.Position = UDim2.new(0, 15, 0, 8)
+modalIcon.BackgroundTransparency = 1
+modalIcon.Image = ID_CARTUCHO_BORDA
+modalIcon.ZIndex = 11
+modalIcon.Parent = modalHeader
+
+local modalTitle = Instance.new("TextLabel")
+modalTitle.Size = UDim2.new(1, -90, 1, 0)
+modalTitle.Position = UDim2.new(0, 45, 0, 0)
+modalTitle.BackgroundTransparency = 1
+modalTitle.Text = "Salvar em Categoria"
+modalTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+modalTitle.TextSize = 14
+modalTitle.Font = Enum.Font.Arcade
+modalTitle.TextXAlignment = Enum.TextXAlignment.Left
+modalTitle.ZIndex = 11
+modalTitle.Parent = modalHeader
+
+local closeModalBtn = Instance.new("TextButton")
+closeModalBtn.Size = UDim2.new(0, 26, 0, 26)
+closeModalBtn.Position = UDim2.new(1, -35, 0, 7)
+closeModalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+closeModalBtn.Text = "X"
+closeModalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeModalBtn.TextSize = 14
+closeModalBtn.Font = Enum.Font.Arcade
+closeModalBtn.ZIndex = 11
+closeModalBtn.Parent = modalHeader
+Instance.new("UICorner", closeModalBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", closeModalBtn).Color = Color3.fromRGB(255, 255, 255)
+
+closeModalBtn.MouseButton1Click:Connect(function()
+    saveModal.Visible = false
+end)
+
+local modalSub = Instance.new("TextLabel")
+modalSub.Size = UDim2.new(1, -30, 0, 20)
+modalSub.Position = UDim2.new(0, 15, 0, 42)
+modalSub.BackgroundTransparency = 1
+modalSub.Text = "Escolha uma categoria para salvar o emote:"
+modalSub.TextColor3 = Color3.fromRGB(200, 200, 200)
+modalSub.TextSize = 11
+modalSub.Font = Enum.Font.Arcade
+modalSub.TextXAlignment = Enum.TextXAlignment.Left
+modalSub.ZIndex = 11
+modalSub.Parent = saveModal
+
+local modalScrolling = Instance.new("ScrollingFrame")
+modalScrolling.Size = UDim2.new(1, -30, 0, 85)
+modalScrolling.Position = UDim2.new(0, 15, 0, 68)
+modalScrolling.BackgroundTransparency = 1
+modalScrolling.ScrollBarThickness = 2
+modalScrolling.ZIndex = 11
+modalScrolling.Parent = saveModal
+
+local modalListLayout = Instance.new("UIListLayout")
+modalListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+modalListLayout.Padding = UDim.new(0, 5)
+modalListLayout.Parent = modalScrolling
+
+local targetCategoryToSave = nil
+
+openSaveModal = function()
+    for _, child in ipairs(modalScrolling:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    
+    for _, cat in ipairs(emoteData.categories) do
+        local catBtn = Instance.new("TextButton")
+        catBtn.Size = UDim2.new(1, -5, 0, 30)
+        catBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+        catBtn.Text = "  " .. cat.name .. "    >"
+        catBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        catBtn.TextSize = 12
+        catBtn.Font = Enum.Font.Arcade
+        catBtn.TextXAlignment = Enum.TextXAlignment.Left
+        catBtn.ZIndex = 12
+        catBtn.Parent = modalScrolling
+        Instance.new("UICorner", catBtn).CornerRadius = UDim.new(0, 6)
+        Instance.new("UIStroke", catBtn).Color = Color3.fromRGB(200, 200, 200)
+        
+        catBtn.MouseButton1Click:Connect(function()
+            targetCategoryToSave = cat.name
+            for _, b in ipairs(modalScrolling:GetChildren()) do
+                if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(15, 15, 15) end
+            end
+            catBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        end)
+    end
+    
+    saveModal.Visible = true
+end
+
+local saveConfirmBtn = Instance.new("TextButton")
+saveConfirmBtn.Size = UDim2.new(1, -30, 0, 32)
+saveConfirmBtn.Position = UDim2.new(0, 15, 1, -40)
+saveConfirmBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+saveConfirmBtn.Text = "Salvar"
+saveConfirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveConfirmBtn.TextSize = 13
+saveConfirmBtn.Font = Enum.Font.Arcade
+saveConfirmBtn.ZIndex = 11
+saveConfirmBtn.Parent = saveModal
+Instance.new("UICorner", saveConfirmBtn).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", saveConfirmBtn).Color = Color3.fromRGB(255, 255, 255)
+
+saveConfirmBtn.MouseButton1Click:Connect(function()
+    if selectedEmoteItem and targetCategoryToSave then
+        local id = tostring(selectedEmoteItem.AssetId or selectedEmoteItem.Id)
+        for _, cat in ipairs(emoteData.categories) do
+            if cat.name == targetCategoryToSave then
+                local exists = false
+                for _, emoteId in ipairs(cat.emotes) do
+                    if tostring(emoteId) == id then exists = true break end
+                end
+                if not exists then
+                    table.insert(cat.emotes, id)
+                end
+            end
+        end
+        saveModal.Visible = false
+        buildCategoriesMenu()
+    end
+end)
+
+-- Roda Radial (8 Seções)
+local WHEEL_SIZE = 300
+local wheelFrame = Instance.new("Frame")
+wheelFrame.Size = UDim2.new(0, WHEEL_SIZE, 0, WHEEL_SIZE)
+wheelFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+wheelFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+wheelFrame.BackgroundTransparency = 1
+wheelFrame.Parent = mainContainer
+
+local outerCircle = Instance.new("Frame")
+outerCircle.Size = UDim2.new(1, 0, 1, 0)
+outerCircle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+outerCircle.Parent = wheelFrame
+Instance.new("UICorner", outerCircle).CornerRadius = UDim.new(0.5, 0)
+local outerStroke = Instance.new("UIStroke")
+outerStroke.Color = Color3.fromRGB(255, 255, 255)
+outerStroke.Thickness = 3
+outerStroke.Parent = outerCircle
+
+local CENTER_RATIO = 0.42
+local centerCircle = Instance.new("Frame")
+centerCircle.Size = UDim2.new(CENTER_RATIO, 0, CENTER_RATIO, 0)
+centerCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+centerCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
+centerCircle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+centerCircle.ZIndex = 4
+centerCircle.Parent = wheelFrame
+Instance.new("UICorner", centerCircle).CornerRadius = UDim.new(0.5, 0)
+local centerStroke = Instance.new("UIStroke")
+centerStroke.Color = Color3.fromRGB(255, 255, 255)
+centerStroke.Thickness = 2
+centerStroke.Parent = centerCircle
+
+local centerText = Instance.new("TextLabel")
+centerText.Size = UDim2.new(0.8, 0, 0.8, 0)
+centerText.AnchorPoint = Vector2.new(0.5, 0.5)
+centerText.Position = UDim2.new(0.5, 0, 0.5, 0)
+centerText.BackgroundTransparency = 1
+centerText.Text = "Selecione um\nemote"
+centerText.TextColor3 = Color3.fromRGB(255, 255, 255)
+centerText.TextScaled = true
+centerText.Font = Enum.Font.Arcade
+centerText.ZIndex = 5
+centerText.Parent = centerCircle
+
+local radiusTotal = WHEEL_SIZE / 2
+local innerRadius = radiusTotal * CENTER_RATIO
+local outerRadius = radiusTotal
+local slotLabelRadius = (innerRadius + outerRadius) / 2
+
+local TOTAL_SLOTS = 8
+
+updateWheelSlots = function()
+    for i = 1, TOTAL_SLOTS do
+        local item = catalogItems[i]
+        local btn = slotButtons[i]
+        local img = slotImages[i]
+        
+        if item then
+            btn.Text = "" 
+            img.Image = "rbxthumb://type=Asset&id=" .. tostring(item.AssetId or item.Id) .. "&w=150&h=150"
+            img.Visible = true
+        else
+            btn.Text = tostring(i)
+            img.Image = ""
+            img.Visible = false
+        end
+    end
+end
+
+loadPage = function(targetPage)
+    task.spawn(function()
+        local params = CatalogSearchParams.new()
+        params.SearchKeyword = currentKeyword
+        params.AssetTypes = { Enum.AvatarAssetType.EmoteAnimation }
+        params.SortType = Enum.CatalogSortType.RecentlyCreated
+        params.Limit = 30
+        
+        local ok, pages = pcall(function() return AvatarEditorService:SearchCatalog(params) end)
+        if ok and pages then
+            local batchCount = math.ceil((targetPage * 8) / 30)
+            for _ = 1, batchCount - 1 do
+                if pages.IsFinished then break end
+                pcall(function() pages:AdvanceToNextPageAsync() end)
+            end
+            
+            local successList, list = pcall(function() return pages:GetCurrentPage() end)
+            if successList and list then
+                catalogItems = {}
+                local startIndex = (((targetPage - 1) * 8) % 30) + 1
+                
+                for j = 1, 8 do
+                    local item = list[startIndex + j - 1]
+                    if currentCategory == "Favoritos" then
+                        local favList = {}
+                        for _, v in ipairs(list) do
+                            if emoteData.favorites[tostring(v.AssetId or v.Id)] then
+                                table.insert(favList, v)
+                            end
+                        end
+                        item = favList[startIndex + j - 1]
+                    elseif currentCategory ~= "All" then
+                        local catList = {}
+                        for _, cat in ipairs(emoteData.categories) do
+                            if cat.name == currentCategory then
+                                for _, id in ipairs(cat.emotes) do
+                                    for _, v in ipairs(list) do
+                                        if tostring(v.AssetId or v.Id) == tostring(id) then
+                                            table.insert(catList, v)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        item = catList[startIndex + j - 1]
+                    end
+                    
+                    if item then
+                        table.insert(catalogItems, item)
+                    end
+                end
+                
+                currentPage = targetPage
+                updateWheelSlots()
+            end
+        end
+    end)
+end
+
+for i = 1, TOTAL_SLOTS do
+    local slotAngleDeg = ((i - 1) * (360 / TOTAL_SLOTS)) - 90
+    local slotAngleRad = math.rad(slotAngleDeg)
+    
+    local slotX = radiusTotal + (math.cos(slotAngleRad) * slotLabelRadius)
+    local slotY = radiusTotal + (math.sin(slotAngleRad) * slotLabelRadius)
+
+    local slotButton = Instance.new("TextButton")
+    slotButton.Size = UDim2.new(0, 42, 0, 42)
+    slotButton.AnchorPoint = Vector2.new(0.5, 0.5)
+    slotButton.Position = UDim2.new(0, slotX, 0, slotY)
+    slotButton.BackgroundTransparency = 1
+    slotButton.Text = tostring(i)
+    slotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    slotButton.TextSize = 16
+    slotButton.Font = Enum.Font.Arcade
+    slotButton.ZIndex = 6
+    slotButton.Parent = wheelFrame
+
+    local slotImg = Instance.new("ImageLabel")
+    slotImg.Size = UDim2.new(1, 0, 1, 0)
+    slotImg.BackgroundTransparency = 1
+    slotImg.ScaleType = Enum.ScaleType.Fit
+    slotImg.ZIndex = 6
+    slotImg.Parent = slotButton
+
+    slotButton.MouseButton1Click:Connect(function()
+        local item = catalogItems[i]
+        if item then
+            selectedEmoteItem = item
+            centerText.Text = item.Name or "Emote"
+            cartridgeButton.Visible = true
+            LoadTrack(item.AssetId or item.Id)
+        end
+    end)
+    
+    slotButtons[i] = slotButton
+    slotImages[i] = slotImg
+end
+
+-- Rodapé de Paginação Ajustado (Espaçamento corrigido para evitar sobreposição das setas com a numeração)
+local navContainer = Instance.new("Frame")
+navContainer.Size = UDim2.new(0, 300, 0, 35)
+navContainer.AnchorPoint = Vector2.new(0.5, 0)
+navContainer.Position = UDim2.new(0.5, 0, 0.85, 0)
+navContainer.BackgroundTransparency = 1
+navContainer.Parent = mainContainer
+
+local prevButton = Instance.new("ImageButton")
+prevButton.Size = UDim2.new(0, 32, 0, 32)
+prevButton.Position = UDim2.new(0, 0, 0, 0)
+prevButton.BackgroundTransparency = 1
+prevButton.Image = ID_SETA_ESQUERDA
+prevButton.Parent = navContainer
+
+local pageTextBox = Instance.new("TextBox")
+pageTextBox.Size = UDim2.new(0, 45, 1, 0)
+pageTextBox.Position = UDim2.new(0.35, 0, 0, 0)
+pageTextBox.BackgroundTransparency = 1
+pageTextBox.Text = tostring(currentPage)
+pageTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+pageTextBox.TextSize = 14
+pageTextBox.Font = Enum.Font.Arcade
+pageTextBox.ClearTextOnFocus = false
+pageTextBox.Parent = navContainer
+
+local pageInfoLabel = Instance.new("TextLabel")
+pageInfoLabel.Size = UDim2.new(0, 100, 1, 0)
+pageInfoLabel.Position = UDim2.new(0.55, 0, 0, 0)
+pageInfoLabel.BackgroundTransparency = 1
+pageInfoLabel.Text = "------   " .. totalPages
+pageInfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+pageInfoLabel.TextSize = 14
+pageInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+pageInfoLabel.Font = Enum.Font.Arcade
+pageInfoLabel.Parent = navContainer
+
+local nextButton = Instance.new("ImageButton")
+nextButton.Size = UDim2.new(0, 32, 0, 32)
+nextButton.Position = UDim2.new(1, -32, 0, 0)
+nextButton.BackgroundTransparency = 1
+nextButton.Image = ID_SETA_DIREITA
+nextButton.Parent = navContainer
+
+prevButton.MouseButton1Click:Connect(function()
+    if currentPage > 1 then
+        currentPage = currentPage - 1
+        pageTextBox.Text = tostring(currentPage)
+        loadPage(currentPage)
+    end
+end)
+
+nextButton.MouseButton1Click:Connect(function()
+    if currentPage < totalPages then
+        currentPage = currentPage + 1
+        pageTextBox.Text = tostring(currentPage)
+        loadPage(currentPage)
+    end
+end)
+
+pageTextBox.FocusLost:Connect(function()
+    local num = tonumber(pageTextBox.Text)
+    if num then
+        currentPage = math.clamp(num, 1, totalPages)
+        pageTextBox.Text = tostring(currentPage)
+        loadPage(currentPage)
+    else
+        pageTextBox.Text = tostring(currentPage)
+    end
+end)
+
+searchBox.FocusLost:Connect(function()
+    currentKeyword = searchBox.Text
+    currentPage = 1
+    loadPage(currentPage)
+end)
+
+buildCategoriesMenu = function()
+    for _, child in ipairs(sideScrolling:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    
+    local function createCatBtn(name, count)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -5, 0, 32)
+        btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        btn.Text = "  " .. name .. "  (" .. count .. ")"
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 11
+        btn.Font = Enum.Font.Arcade
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.Parent = sideScrolling
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        Instance.new("UIStroke", btn).Color = Color3.fromRGB(255, 255, 255)
+        
+        btn.MouseButton1Click:Connect(function()
+            currentCategory = name
+            currentPage = 1
+            loadPage(currentPage)
+            sidePanel.Visible = false
+        end)
+    end
+    
+    createCatBtn("All", "Todos")
+    local favCount = 0
+    for _, _ in pairs(emoteData.favorites) do favCount = favCount + 1 end
+    createCatBtn("Favoritos", favCount)
+    
+    for _, cat in ipairs(emoteData.categories) do
+        createCatBtn(cat.name, #cat.emotes)
+    end
+end
+
+buildCategoriesMenu()
+loadPage(1)
+
+print("✅ Roda Radial ajustada com espaçamento perfeito de paginação e setas por ID livres!")
