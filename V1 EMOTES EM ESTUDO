@@ -241,7 +241,7 @@ navLayout.FillDirection = Enum.FillDirection.Horizontal
 navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 navLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 navLayout.SortOrder = Enum.SortOrder.LayoutOrder
-navLayout.Padding = UDim.new(0, 8) -- Espaçamento calibrado para dar a mesma distância exata na seta direita e esquerda
+navLayout.Padding = UDim.new(0, 9) -- Espaçamento calibrado para dar a mesma distância exata na seta direita e esquerda
 navLayout.Parent = navContainer
 
 local prevButton = Instance.new("ImageButton")
