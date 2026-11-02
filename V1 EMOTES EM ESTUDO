@@ -1,6 +1,6 @@
 --[[ 
     Script: 7yd7 | Roda Radial de Emotes
-    Visual atualizado com novos ícones, UI de categorias e modal de salvar ajustados.
+    Ajustes: Trava de rolagem no modal, botão X limpo, alinhamento de ícones e centralização de textos.
 ]]
 
 local Players = game:GetService("Players")
@@ -28,7 +28,7 @@ local ID_CARTUCHO_SEMBORDA = "rbxassetid://96618641654782"
 local ID_BTN_DOCUMENTO = "rbxassetid://76204370315940"
 local ID_BTN_EXTERNO = "rbxassetid://115103675836200"
 
--- NOVOS IDs SOLICITADOS
+-- IDs dos Ícones
 local ID_ICONE_SOL = "rbxassetid://77667780640343"
 local ID_SIMBOLO_MAIS = "rbxassetid://85682941433471"
 local ID_SIMBOLO_LIXEIRA = "rbxassetid://78774633521849"
@@ -289,7 +289,7 @@ sideStroke.Color = Color3.fromRGB(255, 255, 255)
 sideStroke.Thickness = 2
 sidePanel.ClipsDescendants = true 
 
--- Header ajustado (Sol e Texto Centralizados)
+-- Header Centralizado
 local sideHeader = Instance.new("Frame")
 sideHeader.Size = UDim2.new(1, 0, 0, 40)
 sideHeader.BackgroundTransparency = 1
@@ -315,7 +315,7 @@ sideTitle.Font = Enum.Font.Arcade
 sideTitle.TextXAlignment = Enum.TextXAlignment.Left
 sideTitle.Parent = sideHeader
 
--- Ajuste do ScrollingFrame para não obstruir os botões de baixo
+-- ScrollingFrame Travado
 local sideScrolling = Instance.new("ScrollingFrame")
 sideScrolling.Size = UDim2.new(1, -8, 1, -100) 
 sideScrolling.Position = UDim2.new(0, 4, 0, 42)
@@ -340,39 +340,49 @@ local createCatGlobalBtn = Instance.new("TextButton")
 createCatGlobalBtn.Size = UDim2.new(1, -8, 0, 24)
 createCatGlobalBtn.Position = UDim2.new(0, 4, 1, -56)
 createCatGlobalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-createCatGlobalBtn.Text = "   Criar Categoria  >"
+createCatGlobalBtn.Text = "     Criar Categoria"
 createCatGlobalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 createCatGlobalBtn.TextSize = 9
 createCatGlobalBtn.Font = Enum.Font.Arcade
-createCatGlobalBtn.TextXAlignment = Enum.TextXAlignment.Center
+createCatGlobalBtn.TextXAlignment = Enum.TextXAlignment.Left
 createCatGlobalBtn.Parent = sidePanel
 Instance.new("UICorner", createCatGlobalBtn).CornerRadius = UDim.new(0, 4)
 local cStroke = Instance.new("UIStroke", createCatGlobalBtn); cStroke.Color = Color3.fromRGB(255,255,255); cStroke.Thickness = 1.5; cStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local plusIcon = Instance.new("ImageLabel")
-plusIcon.Size = UDim2.fromOffset(12, 12)
+plusIcon.Size = UDim2.fromOffset(10, 10)
 plusIcon.Position = UDim2.new(0, 8, 0.5, 0)
 plusIcon.AnchorPoint = Vector2.new(0, 0.5)
 plusIcon.BackgroundTransparency = 1
 plusIcon.Image = ID_SIMBOLO_MAIS
 plusIcon.Parent = createCatGlobalBtn
 
+local plusArrow = Instance.new("TextLabel")
+plusArrow.Size = UDim2.new(0, 10, 1, 0)
+plusArrow.Position = UDim2.new(1, -15, 0, 0)
+plusArrow.BackgroundTransparency = 1
+plusArrow.Text = ">"
+plusArrow.TextColor3 = Color3.fromRGB(255, 255, 255)
+plusArrow.TextSize = 10
+plusArrow.Font = Enum.Font.Arcade
+plusArrow.Parent = createCatGlobalBtn
+
 -- Botão Remover Categoria
 local removeCatGlobalBtn = Instance.new("TextButton")
 removeCatGlobalBtn.Size = UDim2.new(1, -8, 0, 24)
 removeCatGlobalBtn.Position = UDim2.new(0, 4, 1, -28)
 removeCatGlobalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-removeCatGlobalBtn.Text = "   Remover Categoria"
+removeCatGlobalBtn.Text = "     Remover Categoria"
 removeCatGlobalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 removeCatGlobalBtn.TextSize = 9
 removeCatGlobalBtn.Font = Enum.Font.Arcade
-removeCatGlobalBtn.TextXAlignment = Enum.TextXAlignment.Center
+removeCatGlobalBtn.TextXAlignment = Enum.TextXAlignment.Left
 removeCatGlobalBtn.Parent = sidePanel
 Instance.new("UICorner", removeCatGlobalBtn).CornerRadius = UDim.new(0, 4)
 local rStroke = Instance.new("UIStroke", removeCatGlobalBtn); rStroke.Color = Color3.fromRGB(255,255,255); rStroke.Thickness = 1.5; rStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local trashIcon = Instance.new("ImageLabel")
-trashIcon.Size = UDim2.fromOffset(12, 12)
+trashIcon.Size = UDim2.fromOffset(10, 10)
 trashIcon.Position = UDim2.new(0, 8, 0.5, 0)
 trashIcon.AnchorPoint = Vector2.new(0, 0.5)
 trashIcon.BackgroundTransparency = 1
@@ -383,8 +393,8 @@ docButton.MouseButton1Click:Connect(function() sidePanel.Visible = not sidePanel
 
 local function promptRenameCategory(oldName, btn)
     local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(1, -30, 1, 0)
-    textBox.Position = UDim2.new(0, 26, 0, 0)
+    textBox.Size = UDim2.new(1, -35, 1, 0)
+    textBox.Position = UDim2.new(0, 28, 0, 0)
     textBox.BackgroundTransparency = 1
     textBox.Text = oldName
     textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -394,7 +404,7 @@ local function promptRenameCategory(oldName, btn)
     textBox.Parent = btn
     
     for _, v in pairs(btn:GetChildren()) do
-        if v:IsA("TextLabel") and v.Name ~= "EditBox" then v.Visible = false end
+        if v:IsA("TextLabel") and v.Name ~= "EditBox" and v.Text ~= ">" then v.Visible = false end
     end
     textBox:CaptureFocus()
     
@@ -437,7 +447,7 @@ removeCatGlobalBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- MODAL SALVAR (Ajustado ao Visual)
+-- MODAL SALVAR
 -- ==========================================
 local saveModal = Instance.new("Frame")
 saveModal.Size = UDim2.fromOffset(280, 200)
@@ -456,25 +466,20 @@ modalHeader.BackgroundTransparency = 1
 modalHeader.ZIndex = 11
 modalHeader.Parent = saveModal
 
--- Botão X (Fechar)
+-- Botão X (Limpo)
 local closeModalBtn = Instance.new("TextButton")
 closeModalBtn.Size = UDim2.fromOffset(20, 20)
 closeModalBtn.AnchorPoint = Vector2.new(1, 0.5)
 closeModalBtn.Position = UDim2.new(1, -8, 0, 16)
 closeModalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-closeModalBtn.Text = ""
+closeModalBtn.Text = "X"
+closeModalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeModalBtn.TextSize = 12
+closeModalBtn.Font = Enum.Font.Arcade
 closeModalBtn.ZIndex = 11
 closeModalBtn.Parent = modalHeader
 Instance.new("UICorner", closeModalBtn).CornerRadius = UDim.new(0, 4)
 local xStroke = Instance.new("UIStroke", closeModalBtn); xStroke.Color = Color3.fromRGB(255,255,255); xStroke.Thickness = 1; xStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-local closeIcon = Instance.new("ImageLabel")
-closeIcon.Size = UDim2.new(1, -6, 1, -6)
-closeIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
-closeIcon.AnchorPoint = Vector2.new(0.5, 0.5)
-closeIcon.BackgroundTransparency = 1
-closeIcon.Image = ID_SIMBOLO_LIXEIRA
-closeIcon.Parent = closeModalBtn
 
 closeModalBtn.MouseButton1Click:Connect(function() saveModal.Visible = false end)
 
@@ -510,6 +515,7 @@ modalSubtitle.TextXAlignment = Enum.TextXAlignment.Left
 modalSubtitle.ZIndex = 11
 modalSubtitle.Parent = saveModal
 
+-- ScrollingFrame do Modal travado e ajustado
 local modalScrolling = Instance.new("ScrollingFrame")
 modalScrolling.Size = UDim2.new(1, -20, 0, 75)
 modalScrolling.Position = UDim2.new(0, 10, 0, 55)
@@ -517,7 +523,9 @@ modalScrolling.BackgroundTransparency = 1
 modalScrolling.ScrollBarThickness = 2
 modalScrolling.ZIndex = 11
 modalScrolling.Parent = saveModal
-Instance.new("UIListLayout", modalScrolling).Padding = UDim.new(0, 4)
+local mListLayout = Instance.new("UIListLayout")
+mListLayout.Padding = UDim.new(0, 4)
+mListLayout.Parent = modalScrolling
 
 local targetCategoryToSave = nil
 
@@ -556,12 +564,14 @@ openSaveModal = function()
         catText.ZIndex = 12
         catText.Parent = catBtn
 
-        local catArrow = Instance.new("ImageLabel")
-        catArrow.Size = UDim2.fromOffset(10, 10)
-        catArrow.Position = UDim2.new(1, -16, 0.5, 0)
-        catArrow.AnchorPoint = Vector2.new(0, 0.5)
+        local catArrow = Instance.new("TextLabel")
+        catArrow.Size = UDim2.new(0, 10, 1, 0)
+        catArrow.Position = UDim2.new(1, -16, 0, 0)
         catArrow.BackgroundTransparency = 1
-        catArrow.Image = "rbxassetid://6031091004"
+        catArrow.Text = ">"
+        catArrow.TextColor3 = Color3.fromRGB(255, 255, 255)
+        catArrow.TextSize = 10
+        catArrow.Font = Enum.Font.Arcade
         catArrow.ZIndex = 12
         catArrow.Parent = catBtn
         
@@ -570,38 +580,46 @@ openSaveModal = function()
             for _, b in ipairs(modalScrolling:GetChildren()) do 
                 if b:IsA("TextButton") then 
                     b.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-                    for _, child in pairs(b:GetChildren()) do
-                        if child:IsA("TextLabel") then child.TextColor3 = Color3.fromRGB(255, 255, 255) end
-                    end
                 end 
             end
             catBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
         end)
     end
+    modalScrolling.CanvasSize = UDim2.new(0, 0, 0, mListLayout.AbsoluteContentSize.Y)
     saveModal.Visible = true
 end
 
+-- Botão Salvar Centralizado
 local saveConfirmBtn = Instance.new("TextButton")
 saveConfirmBtn.Size = UDim2.new(1, -20, 0, 30)
 saveConfirmBtn.Position = UDim2.new(0, 10, 1, -40)
 saveConfirmBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-saveConfirmBtn.Text = "      Salvar"
-saveConfirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-saveConfirmBtn.TextSize = 12
-saveConfirmBtn.Font = Enum.Font.Arcade
+saveConfirmBtn.Text = ""
 saveConfirmBtn.ZIndex = 11
 saveConfirmBtn.Parent = saveModal
 Instance.new("UICorner", saveConfirmBtn).CornerRadius = UDim.new(0, 6)
-local sStroke = Instance.new("UIStroke", saveConfirmBtn); sStroke.Color = Color3.fromRGB(255,255,255); sStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local sStroke = Instance.new("UIStroke", saveConfirmBtn); sStroke.Color = Color3.fromRGB(255,255,255); sStroke.Thickness = 1.5; sStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local saveConfirmIcon = Instance.new("ImageLabel")
 saveConfirmIcon.Size = UDim2.fromOffset(16, 16)
-saveConfirmIcon.Position = UDim2.new(0, 60, 0.5, 0)
+saveConfirmIcon.Position = UDim2.new(0.5, -35, 0.5, 0)
 saveConfirmIcon.AnchorPoint = Vector2.new(0, 0.5)
 saveConfirmIcon.BackgroundTransparency = 1
 saveConfirmIcon.Image = ID_CARTUCHO_SALVAR
 saveConfirmIcon.ZIndex = 12
 saveConfirmIcon.Parent = saveConfirmBtn
+
+local saveConfirmText = Instance.new("TextLabel")
+saveConfirmText.Size = UDim2.new(0, 60, 1, 0)
+saveConfirmText.Position = UDim2.new(0.5, -10, 0, 0)
+saveConfirmText.BackgroundTransparency = 1
+saveConfirmText.Text = "Salvar"
+saveConfirmText.TextColor3 = Color3.fromRGB(255, 255, 255)
+saveConfirmText.TextSize = 12
+saveConfirmText.Font = Enum.Font.Arcade
+saveConfirmText.TextXAlignment = Enum.TextXAlignment.Left
+saveConfirmText.ZIndex = 12
+saveConfirmText.Parent = saveConfirmBtn
 
 saveConfirmBtn.MouseButton1Click:Connect(function()
     if selectedEmoteItem and targetCategoryToSave then
@@ -851,7 +869,7 @@ buildCategoriesMenu = function()
 
         local icon = Instance.new("ImageLabel")
         icon.Size = UDim2.fromOffset(14, 14)
-        icon.Position = UDim2.new(0, 6, 0.5, 0)
+        icon.Position = UDim2.new(0, 8, 0.5, 0)
         icon.AnchorPoint = Vector2.new(0, 0.5)
         icon.BackgroundTransparency = 1
         icon.Image = ID_ICONE_SOL
@@ -860,7 +878,7 @@ buildCategoriesMenu = function()
 
         local label = Instance.new("TextLabel")
         label.Size = UDim2.new(1, -40, 1, 0)
-        label.Position = UDim2.new(0, 26, 0, 0)
+        label.Position = UDim2.new(0, 28, 0, 0)
         label.BackgroundTransparency = 1
         label.Text = name
         label.TextColor3 = (currentCategory == name) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
@@ -869,14 +887,14 @@ buildCategoriesMenu = function()
         label.TextXAlignment = Enum.TextXAlignment.Left
         label.Parent = btn
 
-        local arrow = Instance.new("ImageLabel")
-        arrow.Size = UDim2.fromOffset(10, 10)
-        arrow.Position = UDim2.new(1, -16, 0.5, 0)
-        arrow.AnchorPoint = Vector2.new(0, 0.5)
+        local arrow = Instance.new("TextLabel")
+        arrow.Size = UDim2.new(0, 10, 1, 0)
+        arrow.Position = UDim2.new(1, -18, 0, 0)
         arrow.BackgroundTransparency = 1
-        arrow.Image = "rbxassetid://6031091004" 
-        arrow.ImageColor3 = Color3.fromRGB(255, 255, 255)
-        arrow.Rotation = 0
+        arrow.Text = ">"
+        arrow.TextColor3 = Color3.fromRGB(255, 255, 255)
+        arrow.TextSize = 10
+        arrow.Font = Enum.Font.Arcade
         arrow.Parent = btn
         
         btn.MouseButton1Click:Connect(function()
@@ -903,4 +921,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Visual atualizado com sucesso.")
+print("✅ Interface ajustada e polida com sucesso.")
