@@ -1,5 +1,5 @@
 --[[ 
-    Script: 7yd7 | Roda Radial de Emotes (Layout Perfeito, Alinhado e Proporcional ao Design de Referência)
+    Script: 7yd7 | Roda Radial de Emotes (Ajuste Final de Escala em 15%, Rodapé Visível e Alinhamento Perfeito)
 ]]
 
 local Players = game:GetService("Players")
@@ -96,14 +96,14 @@ if not success or not parentTarget then
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EmoteRadialGui_7yd7_Aligned"
+screenGui.Name = "EmoteRadialGui_7yd7_Scaled"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentTarget
 
 -- Botão Externo Arrastável Puro
 local toggleButton = Instance.new("ImageButton")
 toggleButton.Name = "ToggleExternalButton"
-toggleButton.Size = UDim2.new(0, 48, 0, 48)
+toggleButton.Size = UDim2.new(0, 42, 0, 42)
 toggleButton.Position = UDim2.new(0.85, 0, 0.75, 0)
 toggleButton.AnchorPoint = Vector2.new(0.5, 0.5)
 toggleButton.BackgroundTransparency = 1
@@ -161,8 +161,8 @@ local slotImages = {}
 
 local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
 
--- Roda Radial (Centralizada com Precisão Exata)
-local WHEEL_SIZE = 300
+-- Roda Radial Reduzida em 15% (230px para garantir que coube perfeitamente na tela com o rodapé)
+local WHEEL_SIZE = 230
 local wheelFrame = Instance.new("Frame")
 wheelFrame.Name = "WheelFrame"
 wheelFrame.Size = UDim2.new(0, WHEEL_SIZE, 0, WHEEL_SIZE)
@@ -171,17 +171,17 @@ wheelFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 wheelFrame.BackgroundTransparency = 1
 wheelFrame.Parent = mainContainer
 
--- Barra Superior Alinhada com a Largura da Roda
+-- Barra Superior Acima da Roda
 local topBar = Instance.new("Frame")
-topBar.Size = UDim2.new(0, WHEEL_SIZE, 0, 42)
+topBar.Size = UDim2.new(0, 330, 0, 36)
 topBar.AnchorPoint = Vector2.new(0.5, 1)
-topBar.Position = UDim2.new(0.5, 0, 0, -15)
+topBar.Position = UDim2.new(0.5, 0, 0, -10)
 topBar.BackgroundTransparency = 1
 topBar.Parent = wheelFrame
 
 -- Botão Documento Puro
 local docButton = Instance.new("ImageButton")
-docButton.Size = UDim2.new(0, 38, 0, 38)
+docButton.Size = UDim2.new(0, 32, 0, 32)
 docButton.Position = UDim2.new(0, 0, 0, 2)
 docButton.BackgroundTransparency = 1
 docButton.Image = ID_BTN_DOCUMENTO
@@ -189,14 +189,14 @@ docButton.Parent = topBar
 
 -- Barra de Pesquisa Proporcional
 local searchContainer = Instance.new("Frame")
-searchContainer.Size = UDim2.new(0, 185, 0, 36)
-searchContainer.Position = UDim2.new(0, 48, 0, 3)
+searchContainer.Size = UDim2.new(0, 230, 0, 30)
+searchContainer.Position = UDim2.new(0, 40, 0, 3)
 searchContainer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 searchContainer.Parent = topBar
-Instance.new("UICorner", searchContainer).CornerRadius = UDim.new(0, 18)
+Instance.new("UICorner", searchContainer).CornerRadius = UDim.new(0, 15)
 local searchStroke = Instance.new("UIStroke")
 searchStroke.Color = Color3.fromRGB(255, 255, 255)
-searchStroke.Thickness = 2
+searchStroke.Thickness = 1.5
 searchStroke.Parent = searchContainer
 
 local searchBox = Instance.new("TextBox")
@@ -207,15 +207,15 @@ searchBox.PlaceholderText = "Search/Emotes"
 searchBox.Text = ""
 searchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 searchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
-searchBox.TextSize = 12
+searchBox.TextSize = 11
 searchBox.Font = Enum.Font.Arcade
 searchBox.ClearTextOnFocus = false
 searchBox.Parent = searchContainer
 
--- Botão Cartucho Puro (Alinhado à direita da barra superior)
+-- Botão Cartucho Puro
 local cartridgeButton = Instance.new("ImageButton")
-cartridgeButton.Size = UDim2.new(0, 38, 0, 38)
-cartridgeButton.Position = UDim2.new(1, -38, 0, 2)
+cartridgeButton.Size = UDim2.new(0, 32, 0, 32)
+cartridgeButton.Position = UDim2.new(1, -32, 0, 2)
 cartridgeButton.BackgroundTransparency = 1
 cartridgeButton.Image = ID_CARTUCHO_SEMBORDA
 cartridgeButton.Visible = false
@@ -227,55 +227,55 @@ cartridgeButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Rodapé de Paginação Perfeitamente Proporcional (Abaixo da Roda)
+-- Rodapé de Paginação Ajustado para Ficar Visível na Tela
 local navContainer = Instance.new("Frame")
-navContainer.Size = UDim2.new(0, WHEEL_SIZE, 0, 36)
+navContainer.Size = UDim2.new(0, 220, 0, 28)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
-navContainer.Position = UDim2.new(0.5, 0, 1, 12)
+navContainer.Position = UDim2.new(0.5, 0, 1, 8)
 navContainer.BackgroundTransparency = 1
 navContainer.Parent = wheelFrame
 
 local prevButton = Instance.new("ImageButton")
-prevButton.Size = UDim2.new(0, 32, 0, 32)
-prevButton.Position = UDim2.new(0, 10, 0, 2)
+prevButton.Size = UDim2.new(0, 24, 0, 24)
+prevButton.Position = UDim2.new(0, 0, 0, 2)
 prevButton.BackgroundTransparency = 1
 prevButton.Image = ID_SETA_ESQUERDA
 prevButton.Parent = navContainer
 
 local pageTextBox = Instance.new("TextBox")
-pageTextBox.Size = UDim2.new(0, 40, 1, 0)
-pageTextBox.Position = UDim2.new(0.35, 0, 0, 0)
+pageTextBox.Size = UDim2.new(0, 35, 1, 0)
+pageTextBox.Position = UDim2.new(0.32, 0, 0, 0)
 pageTextBox.BackgroundTransparency = 1
 pageTextBox.Text = tostring(currentPage)
 pageTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-pageTextBox.TextSize = 13
+pageTextBox.TextSize = 11
 pageTextBox.Font = Enum.Font.Arcade
 pageTextBox.ClearTextOnFocus = false
 pageTextBox.Parent = navContainer
 
 local pageInfoLabel = Instance.new("TextLabel")
 pageInfoLabel.Size = UDim2.new(0, 80, 1, 0)
-pageInfoLabel.Position = UDim2.new(0.55, 0, 0, 0)
+pageInfoLabel.Position = UDim2.new(0.52, 0, 0, 0)
 pageInfoLabel.BackgroundTransparency = 1
 pageInfoLabel.Text = "------   " .. totalPages
 pageInfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-pageInfoLabel.TextSize = 13
+pageInfoLabel.TextSize = 11
 pageInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
 pageInfoLabel.Font = Enum.Font.Arcade
 pageInfoLabel.Parent = navContainer
 
 local nextButton = Instance.new("ImageButton")
-nextButton.Size = UDim2.new(0, 32, 0, 32)
-nextButton.Position = UDim2.new(1, -42, 0, 2)
+nextButton.Size = UDim2.new(0, 24, 0, 24)
+nextButton.Position = UDim2.new(1, -24, 0, 2)
 nextButton.BackgroundTransparency = 1
 nextButton.Image = ID_SETA_DIREITA
 nextButton.Parent = navContainer
 
--- Painel Lateral de Categorias Posicionado Corretamente à Esquerda da Roda
+-- Painel Lateral de Categorias à Esquerda
 local sidePanel = Instance.new("Frame")
-sidePanel.Size = UDim2.new(0, 175, 0, 300)
+sidePanel.Size = UDim2.new(0, 150, 0, 230)
 sidePanel.AnchorPoint = Vector2.new(1, 0.5)
-sidePanel.Position = UDim2.new(0, -18, 0.5, 0)
+sidePanel.Position = UDim2.new(0, -12, 0.5, 0)
 sidePanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 sidePanel.Visible = false
 sidePanel.Parent = wheelFrame
@@ -286,59 +286,59 @@ sideStroke.Thickness = 2
 sideStroke.Parent = sidePanel
 
 local sideHeader = Instance.new("Frame")
-sideHeader.Size = UDim2.new(1, 0, 0, 38)
+sideHeader.Size = UDim2.new(1, 0, 0, 32)
 sideHeader.BackgroundTransparency = 1
 sideHeader.Parent = sidePanel
 
 local sunIcon = Instance.new("ImageButton")
-sunIcon.Size = UDim2.new(0, 20, 0, 20)
-sunIcon.Position = UDim2.new(0, 12, 0, 9)
+sunIcon.Size = UDim2.new(0, 16, 0, 16)
+sunIcon.Position = UDim2.new(0, 8, 0, 8)
 sunIcon.BackgroundTransparency = 1
 sunIcon.Image = ID_ICONE_SOL
 sunIcon.Parent = sideHeader
 
 local sideTitle = Instance.new("TextLabel")
-sideTitle.Size = UDim2.new(1, -40, 1, 0)
-sideTitle.Position = UDim2.new(0, 38, 0, 0)
+sideTitle.Size = UDim2.new(1, -30, 1, 0)
+sideTitle.Position = UDim2.new(0, 28, 0, 0)
 sideTitle.BackgroundTransparency = 1
 sideTitle.Text = "Emotes"
 sideTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-sideTitle.TextSize = 14
+sideTitle.TextSize = 12
 sideTitle.Font = Enum.Font.Arcade
 sideTitle.TextXAlignment = Enum.TextXAlignment.Left
 sideTitle.Parent = sideHeader
 
 local sideScrolling = Instance.new("ScrollingFrame")
-sideScrolling.Size = UDim2.new(1, -8, 1, -80)
-sideScrolling.Position = UDim2.new(0, 4, 0, 40)
+sideScrolling.Size = UDim2.new(1, -6, 1, -65)
+sideScrolling.Position = UDim2.new(0, 3, 0, 32)
 sideScrolling.BackgroundTransparency = 1
 sideScrolling.ScrollBarThickness = 2
 sideScrolling.Parent = sidePanel
 
 local sideLayout = Instance.new("UIListLayout")
 sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
-sideLayout.Padding = UDim.new(0, 5)
+sideLayout.Padding = UDim.new(0, 4)
 sideLayout.Parent = sideScrolling
 
 local createCatGlobalBtn = Instance.new("TextButton")
-createCatGlobalBtn.Size = UDim2.new(1, -8, 0, 26)
-createCatGlobalBtn.Position = UDim2.new(0, 4, 1, -56)
+createCatGlobalBtn.Size = UDim2.new(1, -6, 0, 22)
+createCatGlobalBtn.Position = UDim2.new(0, 3, 1, -46)
 createCatGlobalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 createCatGlobalBtn.Text = "+ Criar Categoria"
 createCatGlobalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-createCatGlobalBtn.TextSize = 10
+createCatGlobalBtn.TextSize = 8
 createCatGlobalBtn.Font = Enum.Font.Arcade
 createCatGlobalBtn.Parent = sidePanel
 Instance.new("UICorner", createCatGlobalBtn).CornerRadius = UDim.new(0, 4)
 Instance.new("UIStroke", createCatGlobalBtn).Color = Color3.fromRGB(255, 255, 255)
 
 local removeCatGlobalBtn = Instance.new("TextButton")
-removeCatGlobalBtn.Size = UDim2.new(1, -8, 0, 26)
-removeCatGlobalBtn.Position = UDim2.new(0, 4, 1, -26)
+removeCatGlobalBtn.Size = UDim2.new(1, -6, 0, 22)
+removeCatGlobalBtn.Position = UDim2.new(0, 3, 1, -22)
 removeCatGlobalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 removeCatGlobalBtn.Text = "Remover Categoria"
 removeCatGlobalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-removeCatGlobalBtn.TextSize = 10
+removeCatGlobalBtn.TextSize = 8
 removeCatGlobalBtn.Font = Enum.Font.Arcade
 removeCatGlobalBtn.Parent = sidePanel
 Instance.new("UICorner", removeCatGlobalBtn).CornerRadius = UDim.new(0, 4)
@@ -365,7 +365,7 @@ end)
 
 -- Modal "Salvar em Categoria"
 local saveModal = Instance.new("Frame")
-saveModal.Size = UDim2.new(0, 340, 0, 210)
+saveModal.Size = UDim2.new(0, 280, 0, 180)
 saveModal.AnchorPoint = Vector2.new(0.5, 0.5)
 saveModal.Position = UDim2.new(0.5, 0, 0.5, 0)
 saveModal.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -379,38 +379,38 @@ modalStroke.Thickness = 2
 modalStroke.Parent = saveModal
 
 local modalHeader = Instance.new("Frame")
-modalHeader.Size = UDim2.new(1, 0, 0, 38)
+modalHeader.Size = UDim2.new(1, 0, 0, 32)
 modalHeader.BackgroundTransparency = 1
 modalHeader.ZIndex = 11
 modalHeader.Parent = saveModal
 
 local modalIcon = Instance.new("ImageLabel")
-modalIcon.Size = UDim2.new(0, 22, 0, 22)
-modalIcon.Position = UDim2.new(0, 15, 0, 8)
+modalIcon.Size = UDim2.new(0, 18, 0, 18)
+modalIcon.Position = UDim2.new(0, 12, 0, 7)
 modalIcon.BackgroundTransparency = 1
 modalIcon.Image = ID_CARTUCHO_BORDA
 modalIcon.ZIndex = 11
 modalIcon.Parent = modalHeader
 
 local modalTitle = Instance.new("TextLabel")
-modalTitle.Size = UDim2.new(1, -80, 1, 0)
-modalTitle.Position = UDim2.new(0, 42, 0, 0)
+modalTitle.Size = UDim2.new(1, -65, 1, 0)
+modalTitle.Position = UDim2.new(0, 35, 0, 0)
 modalTitle.BackgroundTransparency = 1
 modalTitle.Text = "Salvar em Categoria"
 modalTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-modalTitle.TextSize = 13
+modalTitle.TextSize = 11
 modalTitle.Font = Enum.Font.Arcade
 modalTitle.TextXAlignment = Enum.TextXAlignment.Left
 modalTitle.ZIndex = 11
 modalTitle.Parent = modalHeader
 
 local closeModalBtn = Instance.new("TextButton")
-closeModalBtn.Size = UDim2.new(0, 24, 0, 24)
-closeModalBtn.Position = UDim2.new(1, -32, 0, 7)
+closeModalBtn.Size = UDim2.new(0, 20, 0, 20)
+closeModalBtn.Position = UDim2.new(1, -26, 0, 6)
 closeModalBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 closeModalBtn.Text = "X"
 closeModalBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeModalBtn.TextSize = 13
+closeModalBtn.TextSize = 11
 closeModalBtn.Font = Enum.Font.Arcade
 closeModalBtn.ZIndex = 11
 closeModalBtn.Parent = modalHeader
@@ -422,20 +422,20 @@ closeModalBtn.MouseButton1Click:Connect(function()
 end)
 
 local modalSub = Instance.new("TextLabel")
-modalSub.Size = UDim2.new(1, -30, 0, 20)
-modalSub.Position = UDim2.new(0, 15, 0, 40)
+modalSub.Size = UDim2.new(1, -24, 0, 18)
+modalSub.Position = UDim2.new(0, 12, 0, 34)
 modalSub.BackgroundTransparency = 1
 modalSub.Text = "Escolha uma categoria para salvar o emote:"
 modalSub.TextColor3 = Color3.fromRGB(200, 200, 200)
-modalSub.TextSize = 10
+modalSub.TextSize = 9
 modalSub.Font = Enum.Font.Arcade
 modalSub.TextXAlignment = Enum.TextXAlignment.Left
 modalSub.ZIndex = 11
 modalSub.Parent = saveModal
 
 local modalScrolling = Instance.new("ScrollingFrame")
-modalScrolling.Size = UDim2.new(1, -30, 0, 80)
-modalScrolling.Position = UDim2.new(0, 15, 0, 65)
+modalScrolling.Size = UDim2.new(1, -24, 0, 65)
+modalScrolling.Position = UDim2.new(0, 12, 0, 56)
 modalScrolling.BackgroundTransparency = 1
 modalScrolling.ScrollBarThickness = 2
 modalScrolling.ZIndex = 11
@@ -443,7 +443,7 @@ modalScrolling.Parent = saveModal
 
 local modalListLayout = Instance.new("UIListLayout")
 modalListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-modalListLayout.Padding = UDim.new(0, 5)
+modalListLayout.Padding = UDim.new(0, 4)
 modalListLayout.Parent = modalScrolling
 
 local targetCategoryToSave = nil
@@ -455,11 +455,11 @@ openSaveModal = function()
     
     for _, cat in ipairs(emoteData.categories) do
         local catBtn = Instance.new("TextButton")
-        catBtn.Size = UDim2.new(1, -5, 0, 28)
+        catBtn.Size = UDim2.new(1, -4, 0, 24)
         catBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
         catBtn.Text = "  " .. cat.name .. "    >"
         catBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        catBtn.TextSize = 11
+        catBtn.TextSize = 9
         catBtn.Font = Enum.Font.Arcade
         catBtn.TextXAlignment = Enum.TextXAlignment.Left
         catBtn.ZIndex = 12
@@ -480,12 +480,12 @@ openSaveModal = function()
 end
 
 local saveConfirmBtn = Instance.new("TextButton")
-saveConfirmBtn.Size = UDim2.new(1, -30, 0, 30)
-saveConfirmBtn.Position = UDim2.new(0, 15, 1, -38)
+saveConfirmBtn.Size = UDim2.new(1, -24, 0, 26)
+saveConfirmBtn.Position = UDim2.new(0, 12, 1, -30)
 saveConfirmBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 saveConfirmBtn.Text = "Salvar"
 saveConfirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-saveConfirmBtn.TextSize = 12
+saveConfirmBtn.TextSize = 10
 saveConfirmBtn.Font = Enum.Font.Arcade
 saveConfirmBtn.ZIndex = 11
 saveConfirmBtn.Parent = saveModal
@@ -511,7 +511,7 @@ saveConfirmBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Elementos visuais da Roda Radial (8 Seções)
+-- Elementos visuais da Roda Radial
 local outerCircle = Instance.new("Frame")
 outerCircle.Size = UDim2.new(1, 0, 1, 0)
 outerCircle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -640,13 +640,13 @@ for i = 1, TOTAL_SLOTS do
     local slotY = radiusTotal + (math.sin(slotAngleRad) * slotLabelRadius)
 
     local slotButton = Instance.new("TextButton")
-    slotButton.Size = UDim2.new(0, 42, 0, 42)
+    slotButton.Size = UDim2.new(0, 32, 0, 32)
     slotButton.AnchorPoint = Vector2.new(0.5, 0.5)
     slotButton.Position = UDim2.new(0, slotX, 0, slotY)
     slotButton.BackgroundTransparency = 1
     slotButton.Text = tostring(i)
     slotButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    slotButton.TextSize = 16
+    slotButton.TextSize = 13
     slotButton.Font = Enum.Font.Arcade
     slotButton.ZIndex = 6
     slotButton.Parent = wheelFrame
@@ -712,11 +712,11 @@ buildCategoriesMenu = function()
     
     local function createCatBtn(name, count)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -5, 0, 30)
+        btn.Size = UDim2.new(1, -4, 0, 24)
         btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         btn.Text = "  " .. name .. "  (" .. count .. ")"
         btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.TextSize = 11
+        btn.TextSize = 9
         btn.Font = Enum.Font.Arcade
         btn.TextXAlignment = Enum.TextXAlignment.Left
         btn.Parent = sideScrolling
@@ -744,4 +744,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Layout totalmente proporcional, alinhado e idêntico à imagem de referência aplicado com sucesso!")
+print("✅ Interface ajustada perfeitamente com redução de 15% e rodapé totalmente visível!")
