@@ -1,5 +1,5 @@
 --[[ 
-    Script: 7yd7 | Roda Radial de Emotes (Seta Direita Ajustada e Contorno Radial de Seleção de Emote)
+    Script: 7yd7 | Roda Radial de Emotes (Simetria Perfeita nas Setas da Barra Inferior)
 ]]
 
 local Players = game:GetService("Players")
@@ -96,7 +96,7 @@ if not success or not parentTarget then
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EmoteRadialGui_7yd7_SelectionIndicator"
+screenGui.Name = "EmoteRadialGui_7yd7_SymmetricArrows"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentTarget
 
@@ -158,7 +158,7 @@ local selectedEmoteItem = nil
 local catalogItems = {}
 local slotButtons = {}
 local slotImages = {}
-local selectionIndicators = {} -- Indicadores visuais de seleção por slot
+local selectionIndicators = {}
 
 local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
 
@@ -228,9 +228,9 @@ cartridgeButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Barra de Navegação Inferior Unificada com espaçamento perfeito para a seta direita não encostar no número[span_2](start_span)[span_2](end_span)
+-- Barra de Navegação Inferior com espaçamento simétrico exato em ambos os lados
 local navContainer = Instance.new("Frame")
-navContainer.Size = UDim2.new(0, 270, 0, 30)
+navContainer.Size = UDim2.new(0, 290, 0, 30)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
 navContainer.Position = UDim2.new(0.5, 0, 1, 10)
 navContainer.BackgroundTransparency = 1
@@ -241,7 +241,7 @@ navLayout.FillDirection = Enum.FillDirection.Horizontal
 navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 navLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 navLayout.SortOrder = Enum.SortOrder.LayoutOrder
-navLayout.Padding = UDim.new(0, 16) -- Espaçamento ampliado para afastar a seta direita do número[span_3](start_span)[span_3](end_span)
+navLayout.Padding = UDim.new(0, 22) -- Espaçamento calibrado para dar a mesma distância exata na seta direita e esquerda
 navLayout.Parent = navContainer
 
 local prevButton = Instance.new("ImageButton")
@@ -265,7 +265,7 @@ pageTextBox.Parent = navContainer
 local pageInfoLabel = Instance.new("TextLabel")
 pageInfoLabel.Size = UDim2.new(0, 65, 0, 24)
 pageInfoLabel.BackgroundTransparency = 1
-pageInfoLabel.Text = "----------" .. totalPages
+pageInfoLabel.Text = "------   " .. totalPages
 pageInfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 pageInfoLabel.TextSize = 12
 pageInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -571,7 +571,6 @@ updateWheelSlots = function()
         local img = slotImages[i]
         local indicator = selectionIndicators[i]
         
-        -- Oculta o indicador ao atualizar/mudar de página
         indicator.Visible = false
         
         if item then
@@ -664,7 +663,6 @@ for i = 1, TOTAL_SLOTS do
     slotButton.ZIndex = 6
     slotButton.Parent = wheelFrame
 
-    -- Indicador visual de seleção radial para o emote clicado
     local selectionIndicator = Instance.new("Frame")
     selectionIndicator.Size = UDim2.new(1, 6, 1, 6)
     selectionIndicator.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -689,7 +687,6 @@ for i = 1, TOTAL_SLOTS do
     slotButton.MouseButton1Click:Connect(function()
         local item = catalogItems[i]
         if item then
-            -- Ativa o indicador de seleção apenas no slot clicado e oculta nos outros
             for _, ind in pairs(selectionIndicators) do
                 ind.Visible = false
             end
@@ -779,4 +776,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Seta direita devidamente afastada e contorno de seleção implementado com sucesso!")
+print("✅ Setas inferior perfeitamente simétricas e espaçadas!")
