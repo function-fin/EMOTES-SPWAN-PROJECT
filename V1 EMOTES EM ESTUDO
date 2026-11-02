@@ -1,5 +1,5 @@
 --[[ 
-    Script: 7yd7 | Roda Radial de Emotes (Navegação Inferior Perfeitamente Centralizada com o Radial)
+    Script: 7yd7 | Roda Radial de Emotes (Barra Inferior Unificada com Layout Automático e Perfeitamente Centralizada)
 ]]
 
 local Players = game:GetService("Players")
@@ -96,7 +96,7 @@ if not success or not parentTarget then
 end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EmoteRadialGui_7yd7_CenteredNav"
+screenGui.Name = "EmoteRadialGui_7yd7_UnifiedNav"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = parentTarget
 
@@ -227,48 +227,56 @@ cartridgeButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Rodapé de Paginação Perfeitamente Centralizado em relação ao Radial
+-- Barra de Navegação Inferior Unificada e Centralizada com UIListLayout
 local navContainer = Instance.new("Frame")
-navContainer.Size = UDim2.new(0, 260, 0, 30)
+navContainer.Size = UDim2.new(0, 240, 0, 30)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
 navContainer.Position = UDim2.new(0.5, 0, 1, 10)
 navContainer.BackgroundTransparency = 1
 navContainer.Parent = wheelFrame
 
+local navLayout = Instance.new("UIListLayout")
+navLayout.FillDirection = Enum.FillDirection.Horizontal
+navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+navLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+navLayout.SortOrder = Enum.SortOrder.LayoutOrder
+navLayout.Padding = UDim.new(0, 12)
+navLayout.Parent = navContainer
+
 local prevButton = Instance.new("ImageButton")
 prevButton.Size = UDim2.new(0, 22, 0, 22)
-prevButton.Position = UDim2.new(0, 45, 0, 4)
 prevButton.BackgroundTransparency = 1
 prevButton.Image = ID_SETA_ESQUERDA
+prevButton.LayoutOrder = 1
 prevButton.Parent = navContainer
 
 local pageTextBox = Instance.new("TextBox")
-pageTextBox.Size = UDim2.new(0, 32, 1, 0)
-pageTextBox.Position = UDim2.new(0.35, 0, 0, 0)
+pageTextBox.Size = UDim2.new(0, 32, 0, 24)
 pageTextBox.BackgroundTransparency = 1
 pageTextBox.Text = tostring(currentPage)
 pageTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 pageTextBox.TextSize = 12
 pageTextBox.Font = Enum.Font.Arcade
 pageTextBox.ClearTextOnFocus = false
+pageTextBox.LayoutOrder = 2
 pageTextBox.Parent = navContainer
 
 local pageInfoLabel = Instance.new("TextLabel")
-pageInfoLabel.Size = UDim2.new(0, 65, 1, 0)
-pageInfoLabel.Position = UDim2.new(0.51, 0, 0, 0)
+pageInfoLabel.Size = UDim2.new(0, 65, 0, 24)
 pageInfoLabel.BackgroundTransparency = 1
 pageInfoLabel.Text = "------   " .. totalPages
 pageInfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 pageInfoLabel.TextSize = 12
 pageInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
 pageInfoLabel.Font = Enum.Font.Arcade
+pageInfoLabel.LayoutOrder = 3
 pageInfoLabel.Parent = navContainer
 
 local nextButton = Instance.new("ImageButton")
 nextButton.Size = UDim2.new(0, 22, 0, 22)
-nextButton.Position = UDim2.new(1, -45, 0, 4)
 nextButton.BackgroundTransparency = 1
 nextButton.Image = ID_SETA_DIREITA
+nextButton.LayoutOrder = 4
 nextButton.Parent = navContainer
 
 -- Painel Lateral de Categorias à Esquerda
@@ -744,4 +752,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Sistema de navegação inferior perfeitamente centralizado com o radial!")
+print("✅ Barra de navegação unificada com UIListLayout e perfeitamente centralizada!")
