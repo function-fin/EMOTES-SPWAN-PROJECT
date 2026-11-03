@@ -1,19 +1,15 @@
 --[[ 
-    Script: 7yd7 | Roda Radial de Emotes — VERSÃO INTEGRADA (Opção B)
-    - Aguarda cache/GitHub ANTES de renderizar (sem "flash" de 4 emotes)
-    - Busca local multi-word + detecção de ID
-    - Favoritos {id, name} + persistência JSON
-    - Total de páginas: 4766 fallback, depois #allEmotes/8 real
-    - Designs validados (Categorias + Modal Salvar) preservados
-    - 3 ajustes: fechar ao usar / categoria não fecha / total dinâmico
+    Script: 7yd7 | Roda Radial de Emotes
+    - Designs corrigidos integrados (Categorias + Modal de Salvar)
+    - Contagem dinâmica de páginas por busca (via estimativa progressiva)
+    - Fechar interface ao selecionar emote
+    - Trocar categoria não fecha painel
 ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local AvatarEditorService = game:GetService("AvatarEditorService")
-local HttpService = game:GetService("HttpService")
-local MarketplaceService = game:GetService("MarketplaceService")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 
@@ -30,204 +26,27 @@ end)
 
 local Settings = { Speed = 1, StopOnMove = true }
 
--- Assets / Ícones
+local ID_CARTUCHO_BORDA = "rbxassetid://96618641654782"
 local ID_CARTUCHO_SEMBORDA = "rbxassetid://96618641654782"
 local ID_BTN_DOCUMENTO = "rbxassetid://76204370315940"
 local ID_BTN_EXTERNO = "rbxassetid://115103675836200"
+
+-- Ícones
 local ID_ICONE_SOL = "rbxassetid://77667780640343"
 local ID_SIMBOLO_MAIS = "rbxassetid://85682941433471"
 local ID_SIMBOLO_LIXEIRA = "rbxassetid://78774633521849"
 local ID_CARTUCHO_SALVAR = "rbxassetid://103168629250780"
 local ID_FECHAR_X = "rbxassetid://78774633521849"
 local ID_LAPIS = "rbxassetid://105157650009654"
+
 local ID_SETA_ESQUERDA = "rbxassetid://112363067871003"
 local ID_SETA_DIREITA = "rbxassetid://138794689086376"
 
 local MARGIN = 12
 
--- =================== PERSISTÊNCIA ===================
-local FOLDER = "7yd7"
-local CATEGORIES_FILE = FOLDER .. "/EmoteCategories.json"
-local EMOTE_CACHE_FILE = FOLDER .. "/EmoteListCache.json"
-local DEFAULT_TOTAL_PAGES = 4766
-
-local function ensureFolder()
-    if isfolder and not isfolder(FOLDER) then
-        pcall(function() makefolder(FOLDER) end)
-    end
-end
-
-local function deepCopy(t)
-    if type(t) ~= "table" then return t end
-    local c = {}
-    for k, v in pairs(t) do c[k] = deepCopy(v) end
-    return c
-end
-
-local emoteData = { Sets = {}, Order = {}, Selected = "All" }
-
-local DEFAULT_EMOTES = {
-    {id = 3360686498, name = "Stadium"},
-    {id = 3360692915, name = "Tilt"},
-    {id = 3576968026, name = "Shrug"},
-    {id = 3360689775, name = "Salute"},
-}
-
--- Nunca vazio (mesmo em falha total)
-local allEmotes = deepCopy(DEFAULT_EMOTES)
-local filteredEmotes = deepCopy(DEFAULT_EMOTES)
-
-local function SaveCategories()
-    ensureFolder()
-    if writefile then
-        pcall(function() writefile(CATEGORIES_FILE, HttpService:JSONEncode(emoteData)) end)
-    end
-end
-
-local function LoadCategories()
-    ensureFolder()
-    if isfile and isfile(CATEGORIES_FILE) then
-        local ok, decoded = pcall(function()
-            return HttpService:JSONDecode(readfile(CATEGORIES_FILE))
-        end)
-        if ok and type(decoded) == "table" and decoded.Sets then
-            emoteData = decoded
-            if not emoteData.Order then emoteData.Order = {} end
-            if not emoteData.Selected then emoteData.Selected = "All" end
-        end
-    end
-    if not emoteData.Sets["All"] then
-        emoteData.Sets["All"] = { emotes = {} }
-        if #emoteData.Order == 0 then
-            emoteData.Order = {"All"}
-        else
-            table.insert(emoteData.Order, 1, "All")
-        end
-        emoteData.Selected = "All"
-    end
-end
-
-LoadCategories()
-
--- =================== CACHE DA LISTA ===================
-local function SaveEmoteCache(list)
-    ensureFolder()
-    if writefile then
-        pcall(function() writefile(EMOTE_CACHE_FILE, HttpService:JSONEncode(list)) end)
-    end
-end
-
-local function LoadEmoteCache()
-    ensureFolder()
-    if isfile and isfile(EMOTE_CACHE_FILE) then
-        local ok, decoded = pcall(function()
-            return HttpService:JSONDecode(readfile(EMOTE_CACHE_FILE))
-        end)
-        if ok and type(decoded) == "table" and #decoded > 0 then
-            return decoded
-        end
-    end
-    return nil
-end
-
-local function fetchEmotesFromGitHub()
-    local ok, result = pcall(function()
-        local json = game:HttpGet("https://raw.githubusercontent.com/7yd7/sniper-Emote/refs/heads/test/EmoteSniper.json")
-        if json and json ~= "" then
-            return HttpService:JSONDecode(json).data or {}
-        end
-        return nil
-    end)
-    if ok and result then
-        local out = {}
-        for _, item in pairs(result) do
-            local id = tonumber(item.id)
-            if id and id > 0 then
-                table.insert(out, {id = id, name = item.name or ("Emote_" .. id)})
-            end
-        end
-        if #out > 0 then return out end
-    end
-    return nil
-end
-
--- =================== HELPERS ===================
-local function smartSearchMatch(name, term)
-    if not term or term == "" then return true end
-    name = tostring(name):lower()
-    term = tostring(term):lower()
-    for word in term:gmatch("%S+") do
-        if not name:find(word, 1, true) then return false end
-    end
-    return true
-end
-
-local function getEmoteName(id)
-    local ok, info = pcall(function()
-        return MarketplaceService:GetProductInfo(tonumber(id))
-    end)
-    if ok and info and info.Name then return info.Name end
-    return "Emote_" .. tostring(id)
-end
-
--- =================== CARREGAMENTO BLOQUEANTE (Opção B) ===================
--- Ordem: 1) cache; 2) se não tem, GitHub; 3) se falhar, defaults.
--- Só segue pra criar a GUI depois de ter uma lista definitiva.
-
-local function loadEmotesBlocking()
-    -- 1) Cache
-    local cached = LoadEmoteCache()
-    if cached and #cached > 0 then
-        allEmotes = cached
-        filteredEmotes = cached
-        print("[7yd7] Emotes carregados do cache:", #cached)
-        return
-    end
-
-    -- 2) GitHub (bloqueante)
-    print("[7yd7] Cache vazio, buscando do GitHub...")
-    local fresh = fetchEmotesFromGitHub()
-    if fresh and #fresh > 0 then
-        allEmotes = fresh
-        filteredEmotes = fresh
-        SaveEmoteCache(fresh)
-        print("[7yd7] Emotes carregados do GitHub:", #fresh)
-        return
-    end
-
-    -- 3) Fallback: API (bloqueante até pegar 1ª página)
-    print("[7yd7] GitHub falhou, tentando API...")
-    local params = CatalogSearchParams.new()
-    params.SearchKeyword = ""
-    params.AssetTypes = { Enum.AvatarAssetType.EmoteAnimation }
-    params.SortType = Enum.CatalogSortType.RecentlyCreated
-    params.Limit = 30
-    local ok, pages = pcall(function() return AvatarEditorService:SearchCatalog(params) end)
-    if ok and pages then
-        local s, list = pcall(function() return pages:GetCurrentPage() end)
-        if s and list and #list > 0 then
-            local out = {}
-            for _, v in ipairs(list) do
-                table.insert(out, {id = v.Id or v.AssetId, name = v.Name or "Emote"})
-            end
-            allEmotes = out
-            filteredEmotes = out
-            SaveEmoteCache(out)
-            print("[7yd7] Emotes carregados da API:", #out)
-            return
-        end
-    end
-
-    -- 4) Último recurso: defaults
-    allEmotes = deepCopy(DEFAULT_EMOTES)
-    filteredEmotes = deepCopy(DEFAULT_EMOTES)
-    print("[7yd7] Usando emotes padrão (fallback total)")
-end
-
-loadEmotesBlocking()
-
--- =================== TRACK ===================
+local emoteData = { categories = {} }
 local CurrentTrack = nil
+
 local function LoadTrack(id)
     if CurrentTrack then CurrentTrack:Stop(0.1) end
     local animId
@@ -264,7 +83,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- =================== PARENT GUI ===================
 local success, parentTarget = pcall(function()
     if gethui then return gethui()
     elseif syn and syn.protect_gui then
@@ -273,15 +91,15 @@ local success, parentTarget = pcall(function()
         return gui
     else return CoreGui end
 end)
-if not success or not parentTarget then parentTarget = LocalPlayer:WaitForChild("PlayerGui") end
+if not success or not parentTarget then parentTarget = Players.LocalPlayer:WaitForChild("PlayerGui") end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EmoteRadialGui_Integrated"
+screenGui.Name = "EmoteRadialGui_Final"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = parentTarget
 
--- =================== BOTÃO EXTERNO ===================
+-- BOTÃO EXTERNO
 local toggleButton = Instance.new("ImageButton")
 toggleButton.Size = UDim2.new(0, 44, 0, 44)
 toggleButton.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -317,17 +135,21 @@ mainContainer.Parent = screenGui
 
 toggleButton.MouseButton1Click:Connect(function() mainContainer.Visible = not mainContainer.Visible end)
 
--- =================== ESTADO ===================
 local currentCategory = "All"
 local currentPage = 1
+local DEFAULT_TOTAL_PAGES = 7415
 local totalPages = DEFAULT_TOTAL_PAGES
 local currentKeyword = ""
 local selectedEmoteItem = nil
 local catalogItems = {}
-local slotButtons, slotImages, slotHighlights, slotTexts = {}, {}, {}, {}
+local slotButtons = {}
+local slotImages = {}
+local slotHighlights = {}
+local slotTexts = {}
+
 local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
 
--- =================== RODA ===================
+-- RODA RADIAL
 local WHEEL_SIZE = 230
 local wheelFrame = Instance.new("Frame")
 wheelFrame.Size = UDim2.fromOffset(WHEEL_SIZE, WHEEL_SIZE)
@@ -336,6 +158,7 @@ wheelFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 wheelFrame.BackgroundTransparency = 1
 wheelFrame.Parent = mainContainer
 
+-- BARRA SUPERIOR
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.fromOffset(310, 32)
 topBar.AnchorPoint = Vector2.new(0.5, 1)
@@ -366,7 +189,7 @@ local searchBox = Instance.new("TextBox")
 searchBox.Size = UDim2.new(1, -16, 1, 0)
 searchBox.Position = UDim2.new(0, 8, 0, 0)
 searchBox.BackgroundTransparency = 1
-searchBox.PlaceholderText = "Search/ID"
+searchBox.PlaceholderText = "Search/Emotes"
 searchBox.Text = ""
 searchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 searchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
@@ -387,6 +210,7 @@ cartridgeButton.Parent = topBar
 
 cartridgeButton.MouseButton1Click:Connect(function() if selectedEmoteItem then openSaveModal() end end)
 
+-- BARRA INFERIOR
 local navContainer = Instance.new("Frame")
 navContainer.Size = UDim2.fromOffset(200, 28)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
@@ -427,10 +251,11 @@ dividerLine.BackgroundTransparency = 1
 dividerLine.LayoutOrder = 3
 dividerLine.Parent = navContainer
 
-for i = 1, 12 do
+local dashCount = 12
+for i = 1, dashCount do
     local dash = Instance.new("Frame")
     dash.Size = UDim2.new(0, 3, 1, 0)
-    dash.Position = UDim2.new((i-1)/12, 0, 0, 0)
+    dash.Position = UDim2.new((i-1)/dashCount, 0, 0, 0)
     dash.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     dash.BorderSizePixel = 0
     dash.Parent = dividerLine
@@ -454,7 +279,10 @@ nextButton.Image = ID_SETA_DIREITA
 nextButton.LayoutOrder = 5
 nextButton.Parent = navContainer
 
--- =================== PAINEL DE CATEGORIAS ===================
+-- ==========================================
+-- PAINEL LATERAL DE CATEGORIAS (visual novo)
+-- Tamanho original preservado: 150x230
+-- ==========================================
 local sidePanel = Instance.new("Frame")
 sidePanel.Size = UDim2.fromOffset(150, 230)
 sidePanel.AnchorPoint = Vector2.new(1, 0.5)
@@ -570,15 +398,16 @@ local removeCatGlobalBtn = createFooterButton("Remover Categoria", ID_SIMBOLO_LI
 
 docButton.MouseButton1Click:Connect(function() sidePanel.Visible = not sidePanel.Visible end)
 
--- =================== RENOMEAR ===================
 local function promptRenameCategory(oldName)
     local targetBtn = nil
     for _, child in ipairs(sideScrolling:GetChildren()) do
         if child:IsA("TextButton") and child:GetAttribute("CategoryName") == oldName then
-            targetBtn = child; break
+            targetBtn = child
+            break
         end
     end
     if not targetBtn then return end
+
     local titleLabel = targetBtn:FindFirstChild("CatTitle")
     if not titleLabel then return end
 
@@ -597,58 +426,43 @@ local function promptRenameCategory(oldName)
     textBox:CaptureFocus()
 
     local finished = false
-    local function finish(commit)
+    local function finishRename(commit)
         if finished then return end
         finished = true
-        if commit and textBox.Text ~= "" and textBox.Text ~= oldName and not emoteData.Sets[textBox.Text] then
+        if commit and textBox.Text ~= "" then
             local newName = textBox.Text
-            emoteData.Sets[newName] = emoteData.Sets[oldName]
-            emoteData.Sets[oldName] = nil
-            for i, n in ipairs(emoteData.Order) do
-                if n == oldName then emoteData.Order[i] = newName; break end
+            for _, cat in ipairs(emoteData.categories) do
+                if cat.name == oldName then cat.name = newName break end
             end
-            if emoteData.Selected == oldName then emoteData.Selected = newName end
             if currentCategory == oldName then currentCategory = newName end
-            SaveCategories()
         end
         textBox:Destroy()
         buildCategoriesMenu()
     end
-    textBox.FocusLost:Connect(function(enterPressed) finish(enterPressed) end)
-end
-
--- =================== CRIAR/REMOVER CATEGORIA ===================
-local function MakeUniqueName(base, name)
-    if not base[name] then return name end
-    local i = 2
-    while base[name .. " (" .. i .. ")"] do i += 1 end
-    return name .. " (" .. i .. ")"
+    textBox.FocusLost:Connect(function(enterPressed) finishRename(enterPressed) end)
 end
 
 createCatGlobalBtn.MouseButton1Click:Connect(function()
-    local name = MakeUniqueName(emoteData.Sets, "Nova Cat")
-    emoteData.Sets[name] = { emotes = {} }
-    table.insert(emoteData.Order, name)
-    SaveCategories()
+    table.insert(emoteData.categories, { name = "Nova Cat " .. (#emoteData.categories + 1), emotes = {} })
     buildCategoriesMenu()
 end)
 
 removeCatGlobalBtn.MouseButton1Click:Connect(function()
     if currentCategory == "All" then return end
-    if emoteData.Sets[currentCategory] then
-        emoteData.Sets[currentCategory] = nil
-        for i, n in ipairs(emoteData.Order) do
-            if n == currentCategory then table.remove(emoteData.Order, i); break end
+    for i, cat in ipairs(emoteData.categories) do
+        if cat.name == currentCategory then
+            table.remove(emoteData.categories, i)
+            currentCategory = "All"
+            break
         end
-        currentCategory = "All"
-        emoteData.Selected = "All"
-        SaveCategories()
-        buildCategoriesMenu()
-        loadPage(1)
     end
+    buildCategoriesMenu()
+    loadPage(1)
 end)
 
--- =================== MODAL SALVAR ===================
+-- ==========================================
+-- MODAL SALVAR (visual novo, 280x200)
+-- ==========================================
 local saveModal = Instance.new("Frame")
 saveModal.Size = UDim2.fromOffset(280, 200)
 saveModal.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -751,69 +565,65 @@ openSaveModal = function()
     end
     targetCategoryToSave = nil
 
-    local i = 1
-    for _, catName in ipairs(emoteData.Order) do
-        if catName ~= "All" then
-            local catBtn = Instance.new("TextButton")
-            catBtn.Size = UDim2.new(1, 0, 0, 26)
-            catBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-            catBtn.AutoButtonColor = false
-            catBtn.Text = ""
-            catBtn.LayoutOrder = i
-            catBtn.ZIndex = 12
-            catBtn.Parent = modalScrolling
-            Instance.new("UICorner", catBtn).CornerRadius = UDim.new(0, 6)
-            local cs = Instance.new("UIStroke", catBtn)
-            cs.Color = Color3.fromRGB(255, 255, 255)
-            cs.Thickness = 1.5
-            cs.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    for i, cat in ipairs(emoteData.categories) do
+        local catBtn = Instance.new("TextButton")
+        catBtn.Size = UDim2.new(1, 0, 0, 26)
+        catBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        catBtn.AutoButtonColor = false
+        catBtn.Text = ""
+        catBtn.LayoutOrder = i
+        catBtn.ZIndex = 12
+        catBtn.Parent = modalScrolling
+        Instance.new("UICorner", catBtn).CornerRadius = UDim.new(0, 6)
+        local cs = Instance.new("UIStroke", catBtn)
+        cs.Color = Color3.fromRGB(255, 255, 255)
+        cs.Thickness = 1.5
+        cs.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-            local catSun = Instance.new("ImageLabel")
-            catSun.Size = UDim2.fromOffset(14, 14)
-            catSun.Position = UDim2.new(0, 10, 0.5, -7)
-            catSun.BackgroundTransparency = 1
-            catSun.Image = ID_ICONE_SOL
-            catSun.ZIndex = 12
-            catSun.Parent = catBtn
+        local catSun = Instance.new("ImageLabel")
+        catSun.Size = UDim2.fromOffset(14, 14)
+        catSun.Position = UDim2.new(0, 10, 0.5, -7)
+        catSun.BackgroundTransparency = 1
+        catSun.Image = ID_ICONE_SOL
+        catSun.ZIndex = 12
+        catSun.Parent = catBtn
 
-            local catText = Instance.new("TextLabel")
-            catText.Size = UDim2.new(1, -50, 1, 0)
-            catText.Position = UDim2.new(0, 32, 0, 0)
-            catText.BackgroundTransparency = 1
-            catText.Text = catName
-            catText.TextColor3 = Color3.fromRGB(255, 255, 255)
-            catText.TextSize = 11
-            catText.Font = Enum.Font.Arcade
-            catText.TextXAlignment = Enum.TextXAlignment.Left
-            catText.ZIndex = 12
-            catText.Parent = catBtn
+        local catText = Instance.new("TextLabel")
+        catText.Size = UDim2.new(1, -50, 1, 0)
+        catText.Position = UDim2.new(0, 32, 0, 0)
+        catText.BackgroundTransparency = 1
+        catText.Text = cat.name
+        catText.TextColor3 = Color3.fromRGB(255, 255, 255)
+        catText.TextSize = 11
+        catText.Font = Enum.Font.Arcade
+        catText.TextXAlignment = Enum.TextXAlignment.Left
+        catText.ZIndex = 12
+        catText.Parent = catBtn
 
-            local catArrow = Instance.new("TextLabel")
-            catArrow.Size = UDim2.new(0, 16, 1, 0)
-            catArrow.Position = UDim2.new(1, -20, 0, 0)
-            catArrow.BackgroundTransparency = 1
-            catArrow.Text = ">"
-            catArrow.TextColor3 = Color3.fromRGB(255, 255, 255)
-            catArrow.TextSize = 11
-            catArrow.Font = Enum.Font.Arcade
-            catArrow.ZIndex = 12
-            catArrow.Parent = catBtn
+        local catArrow = Instance.new("TextLabel")
+        catArrow.Size = UDim2.new(0, 16, 1, 0)
+        catArrow.Position = UDim2.new(1, -20, 0, 0)
+        catArrow.BackgroundTransparency = 1
+        catArrow.Text = ">"
+        catArrow.TextColor3 = Color3.fromRGB(255, 255, 255)
+        catArrow.TextSize = 11
+        catArrow.Font = Enum.Font.Arcade
+        catArrow.ZIndex = 12
+        catArrow.Parent = catBtn
 
-            catBtn.MouseButton1Click:Connect(function()
-                targetCategoryToSave = catName
-                for _, b in ipairs(modalScrolling:GetChildren()) do
-                    if b:IsA("TextButton") then
-                        local s = b:FindFirstChildOfClass("UIStroke")
-                        if s then s.Thickness = 1.5 end
-                        b.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-                    end
+        catBtn.MouseButton1Click:Connect(function()
+            targetCategoryToSave = cat.name
+            for _, b in ipairs(modalScrolling:GetChildren()) do
+                if b:IsA("TextButton") then
+                    local s = b:FindFirstChildOfClass("UIStroke")
+                    if s then s.Thickness = 1.5; s.Color = Color3.fromRGB(255, 255, 255) end
+                    b.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
                 end
-                catBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-                local s = catBtn:FindFirstChildOfClass("UIStroke")
-                if s then s.Thickness = 2 end
-            end)
-            i += 1
-        end
+            end
+            catBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            local s = catBtn:FindFirstChildOfClass("UIStroke")
+            if s then s.Thickness = 2 end
+        end)
     end
     saveModal.Visible = true
 end
@@ -855,16 +665,14 @@ saveConfirmText.Parent = saveConfirmBtn
 saveConfirmBtn.MouseButton1Click:Connect(function()
     if selectedEmoteItem and targetCategoryToSave then
         local id = tostring(selectedEmoteItem.AssetId or selectedEmoteItem.Id)
-        local name = selectedEmoteItem.Name or getEmoteName(id)
-        local cat = emoteData.Sets[targetCategoryToSave]
-        if cat then
-            local exists = false
-            for _, entry in ipairs(cat.emotes) do
-                if tostring(entry.id) == id then exists = true; break end
-            end
-            if not exists then
-                table.insert(cat.emotes, {id = tonumber(id) or id, name = name})
-                SaveCategories()
+        for _, cat in ipairs(emoteData.categories) do
+            if cat.name == targetCategoryToSave then
+                local exists = false
+                for _, emoteId in ipairs(cat.emotes) do
+                    if tostring(emoteId) == id then exists = true; break end
+                end
+                if not exists then table.insert(cat.emotes, id) end
+                break
             end
         end
         saveModal.Visible = false
@@ -873,7 +681,7 @@ saveConfirmBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- =================== ELEMENTOS DA RODA ===================
+-- ====== ELEMENTOS VISUAIS DA RODA ======
 local outerCircle = Instance.new("Frame")
 outerCircle.Size = UDim2.new(1, 0, 1, 0)
 outerCircle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -913,18 +721,22 @@ local innerRadius = radiusTotal * CENTER_RATIO
 local outerRadius = radiusTotal
 local slotLabelRadius = (innerRadius + outerRadius) / 2
 local TOTAL_SLOTS = 8
-local SLICE_ANGLE = 360 / TOTAL_SLOTS
 
+-- Linhas divisórias
+local SLICE_ANGLE = 360 / TOTAL_SLOTS
 for i = 1, TOTAL_SLOTS do
     local dividerAngleDeg = -90 + ((i - 1) * SLICE_ANGLE) - (SLICE_ANGLE / 2)
     local dividerAngleRad = math.rad(dividerAngleDeg)
+
     local x1 = radiusTotal + math.cos(dividerAngleRad) * innerRadius
     local y1 = radiusTotal + math.sin(dividerAngleRad) * innerRadius
     local x2 = radiusTotal + math.cos(dividerAngleRad) * outerRadius
     local y2 = radiusTotal + math.sin(dividerAngleRad) * outerRadius
+
     local dx, dy = x2 - x1, y2 - y1
     local lineLength = math.sqrt(dx * dx + dy * dy)
     local lineAngle = math.deg(math.atan2(dy, dx))
+
     local line = Instance.new("Frame")
     line.Size = UDim2.new(0, lineLength, 0, 2)
     line.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -936,6 +748,7 @@ for i = 1, TOTAL_SLOTS do
     line.Parent = wheelFrame
 end
 
+-- Slots de Emotes
 for i = 1, TOTAL_SLOTS do
     local slotAngleDeg = ((i - 1) * SLICE_ANGLE) - 90
     local slotAngleRad = math.rad(slotAngleDeg)
@@ -983,14 +796,15 @@ for i = 1, TOTAL_SLOTS do
         local item = catalogItems[i]
         if item then
             for _, hl in pairs(slotHighlights) do
-                TweenService:Create(hl, TweenInfo.new(0.15), {BackgroundTransparency = 1}):Play()
+                TweenService:Create(hl, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
             end
-            TweenService:Create(highlightBg, TweenInfo.new(0.15), {BackgroundTransparency = 0.4}):Play()
+
+            TweenService:Create(highlightBg, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.4}):Play()
 
             slotImg.Size = UDim2.new(1, -8, 1, -8)
             TweenService:Create(slotImg, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 1, -16)}):Play()
             task.delay(0.15, function()
-                TweenService:Create(slotImg, TweenInfo.new(0.15), {Size = UDim2.new(1, -8, 1, -8)}):Play()
+                TweenService:Create(slotImg, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Size = UDim2.new(1, -8, 1, -8)}):Play()
             end)
 
             selectedEmoteItem = item
@@ -998,7 +812,7 @@ for i = 1, TOTAL_SLOTS do
             cartridgeButton.Visible = true
             LoadTrack(item.AssetId or item.Id)
 
-            -- ✅ Ajuste 2: fecha toda interface ao selecionar
+            -- ✅ NOVO: fecha toda a interface ao selecionar um emote
             mainContainer.Visible = false
         end
     end)
@@ -1009,15 +823,17 @@ for i = 1, TOTAL_SLOTS do
     slotTexts[i] = slotText
 end
 
-updateWheelSlots = function()
+local function updateWheelSlots()
     for i = 1, TOTAL_SLOTS do
         local item = catalogItems[i]
         local img = slotImages[i]
         local txt = slotTexts[i]
         local hl = slotHighlights[i]
+
         if hl then
             TweenService:Create(hl, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
         end
+
         if item then
             txt.Visible = false
             img.Image = "rbxthumb://type=Asset&id=" .. tostring(item.AssetId or item.Id) .. "&w=150&h=150"
@@ -1030,84 +846,116 @@ updateWheelSlots = function()
     end
 end
 
--- =================== BUSCA / PAGINAÇÃO LOCAL ===================
-local function getSourceList()
-    if currentCategory ~= "All" then
-        local cat = emoteData.Sets[currentCategory]
-        if cat then
-            local list = {}
-            for _, entry in ipairs(cat.emotes) do
-                table.insert(list, {Id = entry.id, AssetId = entry.id, Name = entry.name})
-            end
-            return list
-        end
-    end
-    return filteredEmotes
-end
-
-local function refilterEmotes(term)
-    term = tostring(term or ""):lower()
-    if term == "" then
-        filteredEmotes = allEmotes
-        return
-    end
-    local isId = term:match("^%d+$")
-    local out = {}
-    for _, e in ipairs(allEmotes) do
-        local idStr = tostring(e.id)
-        local nameStr = tostring(e.name)
-        if isId then
-            if idStr == term then table.insert(out, e) end
-        else
-            if smartSearchMatch(nameStr, term) then table.insert(out, e) end
-        end
-    end
-    filteredEmotes = out
-end
-
+-- ==========================================
+-- loadPage — Contagem dinâmica de páginas
+-- Estratégia: acumula a página atual + 3 páginas seguintes (até 480 itens)
+-- Calcula totalPages com base no que achou (estimativa progressiva)
+-- ==========================================
 loadPage = function(targetPage)
-    local source = getSourceList()
+    task.spawn(function()
+        local params = CatalogSearchParams.new()
+        params.SearchKeyword = currentKeyword
+        params.AssetTypes = { Enum.AvatarAssetType.EmoteAnimation }
+        params.SortType = Enum.CatalogSortType.RecentlyCreated
+        params.Limit = 120
 
-    -- Proteção final (não deve ocorrer)
-    if #source == 0 then
-        source = deepCopy(DEFAULT_EMOTES)
-        allEmotes = source
-        filteredEmotes = source
-    end
+        local ok, pages = pcall(function() return AvatarEditorService:SearchCatalog(params) end)
+        if ok and pages then
+            local allFetched = {}
 
-    totalPages = math.max(1, math.ceil(#source / 8))
-    if targetPage > totalPages then targetPage = totalPages end
-    if targetPage < 1 then targetPage = 1 end
-    currentPage = targetPage
-    pageTextBox.Text = tostring(currentPage)
-    pageInfoLabel.Text = tostring(totalPages)
+            -- Página atual
+            local s, list = pcall(function() return pages:GetCurrentPage() end)
+            if s and list then
+                for _, v in ipairs(list) do table.insert(allFetched, v) end
+            end
 
-    catalogItems = {}
-    local startIndex = (currentPage - 1) * 8 + 1
-    for j = 0, 7 do
-        local e = source[startIndex + j]
-        if e then table.insert(catalogItems, e) end
-    end
-    updateWheelSlots()
+            -- + 3 páginas seguintes
+            for _ = 1, 3 do
+                if pages.IsFinished then break end
+                pcall(function() pages:AdvanceToNextPageAsync() end)
+                s, list = pcall(function() return pages:GetCurrentPage() end)
+                if s and list then
+                    for _, v in ipairs(list) do table.insert(allFetched, v) end
+                end
+            end
+
+            -- Filtra por categoria (se não for "All")
+            local sourceList = allFetched
+            if currentCategory ~= "All" then
+                local catSet = {}
+                for _, cat in ipairs(emoteData.categories) do
+                    if cat.name == currentCategory then
+                        for _, id in ipairs(cat.emotes) do catSet[tostring(id)] = true end
+                        break
+                    end
+                end
+                sourceList = {}
+                for _, v in ipairs(allFetched) do
+                    if catSet[tostring(v.AssetId or v.Id)] then table.insert(sourceList, v) end
+                end
+            end
+
+            -- Calcula totalPages
+            if #sourceList > 0 then
+                if currentKeyword == "" and currentCategory == "All" then
+                    totalPages = DEFAULT_TOTAL_PAGES
+                else
+                    totalPages = math.max(1, math.ceil(#sourceList / 8))
+                end
+            else
+                totalPages = 1
+            end
+
+            -- Extrai os 8 emotes da página alvo
+            catalogItems = {}
+            local startIndex = ((targetPage - 1) * 8) + 1
+            for j = 1, 8 do
+                if sourceList[startIndex + j - 1] then
+                    table.insert(catalogItems, sourceList[startIndex + j - 1])
+                end
+            end
+
+            updateWheelSlots()
+            pageInfoLabel.Text = tostring(totalPages)  -- atualiza contador de páginas
+        end
+    end)
 end
 
 prevButton.MouseButton1Click:Connect(function()
-    if currentPage > 1 then loadPage(currentPage - 1) end
+    if currentPage > 1 then
+        currentPage = currentPage - 1
+        pageTextBox.Text = tostring(currentPage)
+        loadPage(currentPage)
+    end
 end)
 nextButton.MouseButton1Click:Connect(function()
-    if currentPage < totalPages then loadPage(currentPage + 1) end
+    if currentPage < totalPages then
+        currentPage = currentPage + 1
+        pageTextBox.Text = tostring(currentPage)
+        loadPage(currentPage)
+    end
 end)
 pageTextBox.FocusLost:Connect(function()
-    local n = tonumber(pageTextBox.Text)
-    if n then loadPage(math.clamp(n, 1, totalPages)) else pageTextBox.Text = tostring(currentPage) end
+    local num = tonumber(pageTextBox.Text)
+    if num then
+        currentPage = math.clamp(num, 1, totalPages)
+        pageTextBox.Text = tostring(currentPage)
+        loadPage(currentPage)
+    else
+        pageTextBox.Text = tostring(currentPage)
+    end
 end)
 searchBox.FocusLost:Connect(function()
     currentKeyword = searchBox.Text
-    refilterEmotes(currentKeyword)
-    loadPage(1)
+    currentPage = 1
+    pageTextBox.Text = tostring(currentPage)
+    loadPage(currentPage)
 end)
 
--- =================== buildCategoriesMenu ===================
+-- ==========================================
+-- buildCategoriesMenu (visual novo, 150x230)
+-- ✅ NOVO: clicar em categoria NÃO fecha o painel
+-- ==========================================
 buildCategoriesMenu = function()
     for _, child in ipairs(sideScrolling:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
@@ -1166,7 +1014,10 @@ buildCategoriesMenu = function()
             pencil.BackgroundTransparency = 1
             pencil.Image = ID_LAPIS
             pencil.Parent = btn
-            pencil.MouseButton1Click:Connect(function() promptRenameCategory(name) end)
+
+            pencil.MouseButton1Click:Connect(function()
+                promptRenameCategory(name)
+            end)
         end
 
         local arrow = Instance.new("TextLabel")
@@ -1180,24 +1031,24 @@ buildCategoriesMenu = function()
         arrow.Parent = btn
 
         btn.MouseButton1Click:Connect(function()
-            if currentCategory == name and not isAll then return end
+            if currentCategory == name and not isAll then
+                return
+            end
             currentCategory = name
-            emoteData.Selected = name
-            loadPage(1)
+            currentPage = 1
+            loadPage(currentPage)
             buildCategoriesMenu()
-            -- ✅ Ajuste 3: sidePanel NÃO fecha
+            -- ✅ NOVO: sidePanel NÃO fecha ao trocar de categoria
         end)
     end
 
-    createCatBtn("All", #allEmotes, true)
-    for _, name in ipairs(emoteData.Order) do
-        if name ~= "All" and emoteData.Sets[name] then
-            createCatBtn(name, #emoteData.Sets[name].emotes, false)
-        end
+    createCatBtn("All", 0, true)
+    for _, cat in ipairs(emoteData.categories) do
+        createCatBtn(cat.name, #cat.emotes, false)
     end
 end
 
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Script integrado (Opção B): lista carregada ANTES de renderizar. Total: " .. tostring(#allEmotes))
+print("✅ Script integrado com designs corrigidos + contagem dinâmica + fechamento ao usar emote.")
