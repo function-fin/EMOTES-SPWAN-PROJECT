@@ -1,7 +1,9 @@
 --[[ 
     Script: 7yd7 | Roda Radial de Emotes
-    Integração dos designs corrigidos de Categorias e Modal de Salvar.
-    Mantidos os tamanhos originais: sidePanel 150x230, saveModal 280x200.
+    - Designs corrigidos integrados (Categorias + Modal de Salvar)
+    - Contagem dinâmica de páginas por busca (via estimativa progressiva)
+    - Fechar interface ao selecionar emote
+    - Trocar categoria não fecha painel
 ]]
 
 local Players = game:GetService("Players")
@@ -35,7 +37,7 @@ local ID_SIMBOLO_MAIS = "rbxassetid://85682941433471"
 local ID_SIMBOLO_LIXEIRA = "rbxassetid://78774633521849"
 local ID_CARTUCHO_SALVAR = "rbxassetid://103168629250780"
 local ID_FECHAR_X = "rbxassetid://78774633521849"
-local ID_LAPIS = "rbxassetid://105157650009654" -- Novo: PENCIL do design de categorias
+local ID_LAPIS = "rbxassetid://105157650009654"
 
 local ID_SETA_ESQUERDA = "rbxassetid://112363067871003"
 local ID_SETA_DIREITA = "rbxassetid://138794689086376"
@@ -135,7 +137,8 @@ toggleButton.MouseButton1Click:Connect(function() mainContainer.Visible = not ma
 
 local currentCategory = "All"
 local currentPage = 1
-local totalPages = 4766
+local DEFAULT_TOTAL_PAGES = 7415
+local totalPages = DEFAULT_TOTAL_PAGES
 local currentKeyword = ""
 local selectedEmoteItem = nil
 local catalogItems = {}
@@ -291,9 +294,8 @@ Instance.new("UICorner", sidePanel).CornerRadius = UDim.new(0, 8)
 local sideStroke = Instance.new("UIStroke", sidePanel)
 sideStroke.Color = Color3.fromRGB(255, 255, 255)
 sideStroke.Thickness = 2
-sidePanel.ClipsDescendants = true 
+sidePanel.ClipsDescendants = true
 
--- Header (35px) — ícone SOL 18x18, título "DATA BASE EMOTE V1"
 local sideHeader = Instance.new("Frame")
 sideHeader.Size = UDim2.new(1, 0, 0, 35)
 sideHeader.BackgroundTransparency = 1
@@ -318,7 +320,6 @@ sideTitle.Font = Enum.Font.Arcade
 sideTitle.TextXAlignment = Enum.TextXAlignment.Left
 sideTitle.Parent = sideHeader
 
--- ScrollingFrame dinâmico (deixa 65px pro footer + 35 do header = 100)
 local sideScrolling = Instance.new("ScrollingFrame")
 sideScrolling.Size = UDim2.new(1, -8, 1, -100)
 sideScrolling.Position = UDim2.new(0, 4, 0, 38)
@@ -340,7 +341,6 @@ sidePadding.PaddingLeft = UDim.new(0, 4)
 sidePadding.PaddingRight = UDim.new(0, 6)
 sidePadding.Parent = sideScrolling
 
--- Footer (65px) com Criar/Remover
 local sideFooter = Instance.new("Frame")
 sideFooter.Size = UDim2.new(1, -8, 0, 62)
 sideFooter.Position = UDim2.new(0, 4, 1, -64)
@@ -398,7 +398,6 @@ local removeCatGlobalBtn = createFooterButton("Remover Categoria", ID_SIMBOLO_LI
 
 docButton.MouseButton1Click:Connect(function() sidePanel.Visible = not sidePanel.Visible end)
 
--- Renomear categoria (usado pelo ícone PENCIL)
 local function promptRenameCategory(oldName)
     local targetBtn = nil
     for _, child in ipairs(sideScrolling:GetChildren()) do
@@ -462,7 +461,7 @@ removeCatGlobalBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- MODAL SALVAR (visual novo, tamanho original 280x200)
+-- MODAL SALVAR (visual novo, 280x200)
 -- ==========================================
 local saveModal = Instance.new("Frame")
 saveModal.Size = UDim2.fromOffset(280, 200)
@@ -478,7 +477,6 @@ mStroke.Color = Color3.fromRGB(255, 255, 255)
 mStroke.Thickness = 2
 mStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
--- Header 38px (compactado do design original de 44)
 local modalHeader = Instance.new("Frame")
 modalHeader.Size = UDim2.new(1, 0, 0, 38)
 modalHeader.BackgroundTransparency = 1
@@ -505,7 +503,6 @@ modalTitle.TextXAlignment = Enum.TextXAlignment.Left
 modalTitle.ZIndex = 11
 modalTitle.Parent = modalHeader
 
--- Botão fechar sem fundo (só imagem pura 22x22)
 local closeModalBtn = Instance.new("ImageButton")
 closeModalBtn.Size = UDim2.fromOffset(22, 22)
 closeModalBtn.AnchorPoint = Vector2.new(1, 0.5)
@@ -517,7 +514,6 @@ closeModalBtn.Parent = modalHeader
 
 closeModalBtn.MouseButton1Click:Connect(function() saveModal.Visible = false end)
 
--- Divider line 1px
 local modalDivider = Instance.new("Frame")
 modalDivider.Size = UDim2.new(1, -24, 0, 1)
 modalDivider.Position = UDim2.new(0, 12, 0, 38)
@@ -526,7 +522,6 @@ modalDivider.BorderSizePixel = 0
 modalDivider.ZIndex = 11
 modalDivider.Parent = saveModal
 
--- Instrução
 local modalSubtitle = Instance.new("TextLabel")
 modalSubtitle.Size = UDim2.new(1, -24, 0, 20)
 modalSubtitle.Position = UDim2.new(0, 12, 0, 42)
@@ -539,9 +534,8 @@ modalSubtitle.TextXAlignment = Enum.TextXAlignment.Left
 modalSubtitle.ZIndex = 11
 modalSubtitle.Parent = saveModal
 
--- ScrollingFrame dinâmico (deixa espaço pro footer 38 + margem)
 local modalScrolling = Instance.new("ScrollingFrame")
-modalScrolling.Size = UDim2.new(1, -24, 1, -122) -- 200 - 38(header) - 20(sub) - 48(footer) - margens
+modalScrolling.Size = UDim2.new(1, -24, 1, -122)
 modalScrolling.Position = UDim2.new(0, 12, 0, 66)
 modalScrolling.BackgroundTransparency = 1
 modalScrolling.ScrollBarThickness = 3
@@ -634,7 +628,6 @@ openSaveModal = function()
     saveModal.Visible = true
 end
 
--- Botão Salvar (footer)
 local saveConfirmBtn = Instance.new("TextButton")
 saveConfirmBtn.Size = UDim2.new(1, -24, 0, 32)
 saveConfirmBtn.Position = UDim2.new(0, 12, 1, -40)
@@ -818,6 +811,9 @@ for i = 1, TOTAL_SLOTS do
             centerText.Text = item.Name or "Emote"
             cartridgeButton.Visible = true
             LoadTrack(item.AssetId or item.Id)
+
+            -- ✅ NOVO: fecha toda a interface ao selecionar um emote
+            mainContainer.Visible = false
         end
     end)
 
@@ -850,55 +846,115 @@ local function updateWheelSlots()
     end
 end
 
+-- ==========================================
+-- loadPage — Contagem dinâmica de páginas
+-- Estratégia: acumula a página atual + 3 páginas seguintes (até 480 itens)
+-- Calcula totalPages com base no que achou (estimativa progressiva)
+-- ==========================================
 loadPage = function(targetPage)
     task.spawn(function()
         local params = CatalogSearchParams.new()
         params.SearchKeyword = currentKeyword
         params.AssetTypes = { Enum.AvatarAssetType.EmoteAnimation }
         params.SortType = Enum.CatalogSortType.RecentlyCreated
-        params.Limit = 30
+        params.Limit = 120
+
         local ok, pages = pcall(function() return AvatarEditorService:SearchCatalog(params) end)
         if ok and pages then
-            local batchCount = math.ceil((targetPage * 8) / 30)
-            for _ = 1, batchCount - 1 do
+            local allFetched = {}
+
+            -- Página atual
+            local s, list = pcall(function() return pages:GetCurrentPage() end)
+            if s and list then
+                for _, v in ipairs(list) do table.insert(allFetched, v) end
+            end
+
+            -- + 3 páginas seguintes
+            for _ = 1, 3 do
                 if pages.IsFinished then break end
                 pcall(function() pages:AdvanceToNextPageAsync() end)
-            end
-            local successList, list = pcall(function() return pages:GetCurrentPage() end)
-            if successList and list then
-                catalogItems = {}
-                local startIndex = (((targetPage - 1) * 8) % 30) + 1
-                for j = 1, 8 do
-                    local item = list[startIndex + j - 1]
-                    if currentCategory ~= "All" then
-                        local catList = {}
-                        for _, cat in ipairs(emoteData.categories) do
-                            if cat.name == currentCategory then
-                                for _, id in ipairs(cat.emotes) do
-                                    for _, v in ipairs(list) do
-                                        if tostring(v.AssetId or v.Id) == tostring(id) then table.insert(catList, v) end
-                                    end
-                                end
-                            end
-                        end
-                        item = catList[startIndex + j - 1]
-                    end
-                    if item then table.insert(catalogItems, item) end
+                s, list = pcall(function() return pages:GetCurrentPage() end)
+                if s and list then
+                    for _, v in ipairs(list) do table.insert(allFetched, v) end
                 end
-                currentPage = targetPage
-                updateWheelSlots()
             end
+
+            -- Filtra por categoria (se não for "All")
+            local sourceList = allFetched
+            if currentCategory ~= "All" then
+                local catSet = {}
+                for _, cat in ipairs(emoteData.categories) do
+                    if cat.name == currentCategory then
+                        for _, id in ipairs(cat.emotes) do catSet[tostring(id)] = true end
+                        break
+                    end
+                end
+                sourceList = {}
+                for _, v in ipairs(allFetched) do
+                    if catSet[tostring(v.AssetId or v.Id)] then table.insert(sourceList, v) end
+                end
+            end
+
+            -- Calcula totalPages
+            if #sourceList > 0 then
+                if currentKeyword == "" and currentCategory == "All" then
+                    totalPages = DEFAULT_TOTAL_PAGES
+                else
+                    totalPages = math.max(1, math.ceil(#sourceList / 8))
+                end
+            else
+                totalPages = 1
+            end
+
+            -- Extrai os 8 emotes da página alvo
+            catalogItems = {}
+            local startIndex = ((targetPage - 1) * 8) + 1
+            for j = 1, 8 do
+                if sourceList[startIndex + j - 1] then
+                    table.insert(catalogItems, sourceList[startIndex + j - 1])
+                end
+            end
+
+            updateWheelSlots()
+            pageInfoLabel.Text = tostring(totalPages)  -- atualiza contador de páginas
         end
     end)
 end
 
-prevButton.MouseButton1Click:Connect(function() if currentPage > 1 then currentPage = currentPage - 1; pageTextBox.Text = tostring(currentPage); loadPage(currentPage) end end)
-nextButton.MouseButton1Click:Connect(function() if currentPage < totalPages then currentPage = currentPage + 1; pageTextBox.Text = tostring(currentPage); loadPage(currentPage) end end)
-pageTextBox.FocusLost:Connect(function() local num = tonumber(pageTextBox.Text); if num then currentPage = math.clamp(num, 1, totalPages); pageTextBox.Text = tostring(currentPage); loadPage(currentPage) else pageTextBox.Text = tostring(currentPage) end end)
-searchBox.FocusLost:Connect(function() currentKeyword = searchBox.Text; currentPage = 1; loadPage(currentPage) end)
+prevButton.MouseButton1Click:Connect(function()
+    if currentPage > 1 then
+        currentPage = currentPage - 1
+        pageTextBox.Text = tostring(currentPage)
+        loadPage(currentPage)
+    end
+end)
+nextButton.MouseButton1Click:Connect(function()
+    if currentPage < totalPages then
+        currentPage = currentPage + 1
+        pageTextBox.Text = tostring(currentPage)
+        loadPage(currentPage)
+    end
+end)
+pageTextBox.FocusLost:Connect(function()
+    local num = tonumber(pageTextBox.Text)
+    if num then
+        currentPage = math.clamp(num, 1, totalPages)
+        pageTextBox.Text = tostring(currentPage)
+        loadPage(currentPage)
+    else
+        pageTextBox.Text = tostring(currentPage)
+    end
+end)
+searchBox.FocusLost:Connect(function()
+    currentKeyword = searchBox.Text
+    currentPage = 1
+    pageTextBox.Text = tostring(currentPage)
+    loadPage(currentPage)
+end)
 
 -- ==========================================
 -- buildCategoriesMenu (visual novo, 150x230)
+-- ✅ NOVO: clicar em categoria NÃO fecha o painel
 -- ==========================================
 buildCategoriesMenu = function()
     for _, child in ipairs(sideScrolling:GetChildren()) do
@@ -951,7 +1007,6 @@ buildCategoriesMenu = function()
         subtitle.TextXAlignment = Enum.TextXAlignment.Left
         subtitle.Parent = btn
 
-        -- Ícone PENCIL só para categorias não-All
         if not isAll then
             local pencil = Instance.new("ImageButton")
             pencil.Size = UDim2.fromOffset(14, 14)
@@ -977,14 +1032,13 @@ buildCategoriesMenu = function()
 
         btn.MouseButton1Click:Connect(function()
             if currentCategory == name and not isAll then
-                -- Clicar na categoria já selecionada: nada (renomear via lápis)
                 return
             end
             currentCategory = name
             currentPage = 1
             loadPage(currentPage)
             buildCategoriesMenu()
-            sidePanel.Visible = false
+            -- ✅ NOVO: sidePanel NÃO fecha ao trocar de categoria
         end)
     end
 
@@ -997,4 +1051,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Script integrado com os designs corrigidos (tamanhos originais mantidos).")
+print("✅ Script integrado com designs corrigidos + contagem dinâmica + fechamento ao usar emote.")
