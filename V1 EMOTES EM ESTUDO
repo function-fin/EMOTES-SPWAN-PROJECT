@@ -1,14 +1,3 @@
---[[ 
-    Script: 7yd7 | Roda Radial de Emotes — HÍBRIDO DEFINITIVO
-    - JSON do 7yd7 (~40k emotes) + fallback API SearchCatalog
-    - Busca local multi-word instantânea + detecção de ID
-    - Cache local em 7yd7/EmoteListCache.json
-    - Auto-cache: emotes novos do API → disco
-    - Total de páginas real (math.ceil(#filtered/8))
-    - Designs validados preservados (Categorias + Modal Salvar)
-    - Ajustes: fechar ao usar / categoria não fecha / total dinâmico
-]]
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -31,7 +20,6 @@ end)
 
 local Settings = { Speed = 1, StopOnMove = true }
 
--- Assets
 local ID_CARTUCHO_BORDA = "rbxassetid://96618641654782"
 local ID_CARTUCHO_SEMBORDA = "rbxassetid://96618641654782"
 local ID_BTN_DOCUMENTO = "rbxassetid://76204370315940"
@@ -47,8 +35,8 @@ local ID_SETA_DIREITA = "rbxassetid://138794689086376"
 
 local MARGIN = 12
 
--- =================== PERSISTÊNCIA ===================
-local FOLDER = "7yd7"
+
+local FOLDER = "SPWAN"
 local EMOTE_CACHE_FILE = FOLDER .. "/EmoteListCache.json"
 local GITHUB_URL = "https://raw.githubusercontent.com/7yd7/sniper-Emote/refs/heads/test/EmoteSniper.json"
 local DEFAULT_TOTAL_PAGES = 7415
@@ -66,7 +54,6 @@ local function deepCopy(t)
     return c
 end
 
--- =================== BANCO DE EMOTES ===================
 local allEmotes = {}
 local filteredEmotes = {}
 local emoteIndexById = {}
@@ -203,7 +190,6 @@ local function getEmoteName(id)
     return "Emote_" .. tostring(id)
 end
 
--- =================== CARREGAMENTO BLOQUEANTE ===================
 print("[7yd7] Carregando emotes (bloqueante)...")
 local loaded = false
 
@@ -212,7 +198,7 @@ if cached then
     allEmotes = cached
     RebuildIndex()
     loaded = true
-    print("[7yd7] ✅ Cache local:", #allEmotes)
+    print("[SPWAN]", #allEmotes)
 end
 
 if not loaded then
@@ -223,12 +209,12 @@ if not loaded then
         RebuildIndex()
         SaveEmoteCache()
         loaded = true
-        print("[7yd7] ✅ GitHub:", #allEmotes)
+        print("[SPWAN]", #allEmotes)
     end
 end
 
 if not loaded then
-    print("[7yd7] GitHub falhou, tentando API...")
+    print("[SPWAN] GitHub falhou, tentando API...")
     local apiList = FetchFromAPI("")
     if apiList and #apiList > 0 then
         allEmotes = apiList
@@ -247,12 +233,11 @@ if not loaded then
         {id = 3360689775, name = "Salute"},
     }
     RebuildIndex()
-    print("[7yd7] ⚠️ Fallback mínimo:", #allEmotes)
+    print("[SPWAN]", #allEmotes)
 end
 
 filteredEmotes = allEmotes
 
--- =================== STATE ===================
 local emoteData = { categories = {} }
 local CurrentTrack = nil
 local currentCategory = "All"
@@ -269,7 +254,6 @@ local searchToken = 0
 
 local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
 
--- =================== TRACK ===================
 local function LoadTrack(id)
     if CurrentTrack then CurrentTrack:Stop(0.1) end
     local animId
@@ -306,7 +290,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- =================== PARENT GUI ===================
 local success, parentTarget = pcall(function()
     if gethui then return gethui()
     elseif syn and syn.protect_gui then
@@ -323,7 +306,6 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = parentTarget
 
--- BOTÃO EXTERNO
 local toggleButton = Instance.new("ImageButton")
 toggleButton.Size = UDim2.new(0, 44, 0, 44)
 toggleButton.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -359,7 +341,6 @@ mainContainer.Parent = screenGui
 
 toggleButton.MouseButton1Click:Connect(function() mainContainer.Visible = not mainContainer.Visible end)
 
--- RODA RADIAL
 local WHEEL_SIZE = 230
 local wheelFrame = Instance.new("Frame")
 wheelFrame.Size = UDim2.fromOffset(WHEEL_SIZE, WHEEL_SIZE)
@@ -368,7 +349,6 @@ wheelFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 wheelFrame.BackgroundTransparency = 1
 wheelFrame.Parent = mainContainer
 
--- BARRA SUPERIOR
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.fromOffset(310, 32)
 topBar.AnchorPoint = Vector2.new(0.5, 1)
@@ -420,7 +400,6 @@ cartridgeButton.Parent = topBar
 
 cartridgeButton.MouseButton1Click:Connect(function() if selectedEmoteItem then openSaveModal() end end)
 
--- BARRA INFERIOR
 local navContainer = Instance.new("Frame")
 navContainer.Size = UDim2.fromOffset(200, 28)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
@@ -489,9 +468,6 @@ nextButton.Image = ID_SETA_DIREITA
 nextButton.LayoutOrder = 5
 nextButton.Parent = navContainer
 
--- ==========================================
--- PAINEL LATERAL DE CATEGORIAS (150x230)
--- ==========================================
 local sidePanel = Instance.new("Frame")
 sidePanel.Size = UDim2.fromOffset(150, 230)
 sidePanel.AnchorPoint = Vector2.new(1, 0.5)
@@ -669,9 +645,6 @@ removeCatGlobalBtn.MouseButton1Click:Connect(function()
     loadPage(1)
 end)
 
--- ==========================================
--- MODAL SALVAR (280x200)
--- ==========================================
 local saveModal = Instance.new("Frame")
 saveModal.Size = UDim2.fromOffset(280, 200)
 saveModal.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1022,7 +995,6 @@ for i = 1, TOTAL_SLOTS do
             cartridgeButton.Visible = true
             LoadTrack(item.id or item.AssetId or item.Id)
 
-            -- ✅ Fecha toda interface
             mainContainer.Visible = false
         end
     end)
@@ -1057,17 +1029,12 @@ local function updateWheelSlots()
     end
 end
 
--- ==========================================
--- loadPage HÍBRIDO
--- ==========================================
 loadPage = function(targetPage)
     searchToken = searchToken + 1
     local myToken = searchToken
 
-    -- PASSO 1: busca local (instantânea)
     local localCount = applySearchLocal(currentKeyword)
 
-    -- Se categoria ≠ "All", filtra pelos IDs salvos
     if currentCategory ~= "All" then
         local catSet = {}
         for _, cat in ipairs(emoteData.categories) do
@@ -1104,7 +1071,6 @@ loadPage = function(targetPage)
     end
     updateWheelSlots()
 
-    -- PASSO 2: fallback API se local < 8 e há keyword e categoria é All
     if localCount < 8 and currentKeyword ~= "" and currentCategory == "All" then
         task.spawn(function()
             local apiList = FetchFromAPI(currentKeyword)
@@ -1174,10 +1140,6 @@ searchBox.FocusLost:Connect(function()
     loadPage(currentPage)
 end)
 
--- ==========================================
--- buildCategoriesMenu (visual novo, 150x230)
--- Clicar em categoria NÃO fecha o painel
--- ==========================================
 buildCategoriesMenu = function()
     for _, child in ipairs(sideScrolling:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
@@ -1260,7 +1222,7 @@ buildCategoriesMenu = function()
             currentPage = 1
             loadPage(currentPage)
             buildCategoriesMenu()
-            -- ✅ sidePanel NÃO fecha ao trocar de categoria
+        
         end)
     end
 
@@ -1272,5 +1234,3 @@ end
 
 buildCategoriesMenu()
 loadPage(1)
-
-print("✅ Script híbrido carregado. Emotes no DB:", #allEmotes)
