@@ -1,9 +1,10 @@
 --[[ 
-    Script: 7yd7 | Roda Radial de Emotes — VERSÃO INTEGRADA
-    - Busca local via lista GitHub + cache (fallback: AvatarEditorService)
-    - Favoritos com {id, name} + persistência JSON
-    - Paginação local real (contagem dinâmica)
-    - Designs validados (Categorias + Modal Salvar)
+    Script: 7yd7 | Roda Radial de Emotes — VERSÃO INTEGRADA (Opção B)
+    - Aguarda cache/GitHub ANTES de renderizar (sem "flash" de 4 emotes)
+    - Busca local multi-word + detecção de ID
+    - Favoritos {id, name} + persistência JSON
+    - Total de páginas: 4766 fallback, depois #allEmotes/8 real
+    - Designs validados (Categorias + Modal Salvar) preservados
     - 3 ajustes: fechar ao usar / categoria não fecha / total dinâmico
 ]]
 
@@ -48,7 +49,7 @@ local MARGIN = 12
 local FOLDER = "7yd7"
 local CATEGORIES_FILE = FOLDER .. "/EmoteCategories.json"
 local EMOTE_CACHE_FILE = FOLDER .. "/EmoteListCache.json"
-local DEFAULT_TOTAL_PAGES = 7415
+local DEFAULT_TOTAL_PAGES = 4766
 
 local function ensureFolder()
     if isfolder and not isfolder(FOLDER) then
@@ -63,12 +64,7 @@ local function deepCopy(t)
     return c
 end
 
--- Estrutura de dados: emoteData.pages = { Sets = { [name] = {emotes = {{id, name}}} }, Order = {...}, Selected = "..." }
-local emoteData = {
-    Sets = {},
-    Order = {},
-    Selected = "All"
-}
+local emoteData = { Sets = {}, Order = {}, Selected = "All" }
 
 local DEFAULT_EMOTES = {
     {id = 3360686498, name = "Stadium"},
@@ -77,16 +73,14 @@ local DEFAULT_EMOTES = {
     {id = 3360689775, name = "Salute"},
 }
 
+-- Nunca vazio (mesmo em falha total)
 local allEmotes = deepCopy(DEFAULT_EMOTES)
 local filteredEmotes = deepCopy(DEFAULT_EMOTES)
 
 local function SaveCategories()
     ensureFolder()
     if writefile then
-        local ok = pcall(function()
-            writefile(CATEGORIES_FILE, HttpService:JSONEncode(emoteData))
-        end)
-        if not ok then warn("[7yd7] Falha ao salvar categorias") end
+        pcall(function() writefile(CATEGORIES_FILE, HttpService:JSONEncode(emoteData)) end)
     end
 end
 
@@ -100,30 +94,26 @@ local function LoadCategories()
             emoteData = decoded
             if not emoteData.Order then emoteData.Order = {} end
             if not emoteData.Selected then emoteData.Selected = "All" end
-            -- Garante categoria "All"
-            if not emoteData.Sets["All"] then
-                emoteData.Sets["All"] = { emotes = {} }
-                table.insert(emoteData.Order, 1, "All")
-            end
         end
     end
-    -- Inicialização padrão
     if not emoteData.Sets["All"] then
         emoteData.Sets["All"] = { emotes = {} }
-        emoteData.Order = {"All"}
+        if #emoteData.Order == 0 then
+            emoteData.Order = {"All"}
+        else
+            table.insert(emoteData.Order, 1, "All")
+        end
         emoteData.Selected = "All"
     end
 end
 
 LoadCategories()
 
--- =================== CACHE DA LISTA DE EMOTES ===================
+-- =================== CACHE DA LISTA ===================
 local function SaveEmoteCache(list)
     ensureFolder()
     if writefile then
-        pcall(function()
-            writefile(EMOTE_CACHE_FILE, HttpService:JSONEncode(list))
-        end)
+        pcall(function() writefile(EMOTE_CACHE_FILE, HttpService:JSONEncode(list)) end)
     end
 end
 
@@ -144,8 +134,7 @@ local function fetchEmotesFromGitHub()
     local ok, result = pcall(function()
         local json = game:HttpGet("https://raw.githubusercontent.com/7yd7/sniper-Emote/refs/heads/test/EmoteSniper.json")
         if json and json ~= "" then
-            local data = HttpService:JSONDecode(json)
-            return data.data or {}
+            return HttpService:JSONDecode(json).data or {}
         end
         return nil
     end)
@@ -162,23 +151,7 @@ local function fetchEmotesFromGitHub()
     return nil
 end
 
-task.spawn(function()
-    local cache = LoadEmoteCache()
-    if cache then allEmotes = cache; filteredEmotes = cache end
-    while true do
-        local fresh = fetchEmotesFromGitHub()
-        if fresh then
-            allEmotes = fresh
-            filteredEmotes = fresh
-            SaveEmoteCache(fresh)
-            if loadPage then loadPage(currentPage) end
-            break
-        end
-        task.wait(3)
-    end
-end)
-
--- =================== HELPERS DE EMOTE ===================
+-- =================== HELPERS ===================
 local function smartSearchMatch(name, term)
     if not term or term == "" then return true end
     name = tostring(name):lower()
@@ -197,7 +170,63 @@ local function getEmoteName(id)
     return "Emote_" .. tostring(id)
 end
 
--- =================== TRACK / PLAY ===================
+-- =================== CARREGAMENTO BLOQUEANTE (Opção B) ===================
+-- Ordem: 1) cache; 2) se não tem, GitHub; 3) se falhar, defaults.
+-- Só segue pra criar a GUI depois de ter uma lista definitiva.
+
+local function loadEmotesBlocking()
+    -- 1) Cache
+    local cached = LoadEmoteCache()
+    if cached and #cached > 0 then
+        allEmotes = cached
+        filteredEmotes = cached
+        print("[7yd7] Emotes carregados do cache:", #cached)
+        return
+    end
+
+    -- 2) GitHub (bloqueante)
+    print("[7yd7] Cache vazio, buscando do GitHub...")
+    local fresh = fetchEmotesFromGitHub()
+    if fresh and #fresh > 0 then
+        allEmotes = fresh
+        filteredEmotes = fresh
+        SaveEmoteCache(fresh)
+        print("[7yd7] Emotes carregados do GitHub:", #fresh)
+        return
+    end
+
+    -- 3) Fallback: API (bloqueante até pegar 1ª página)
+    print("[7yd7] GitHub falhou, tentando API...")
+    local params = CatalogSearchParams.new()
+    params.SearchKeyword = ""
+    params.AssetTypes = { Enum.AvatarAssetType.EmoteAnimation }
+    params.SortType = Enum.CatalogSortType.RecentlyCreated
+    params.Limit = 30
+    local ok, pages = pcall(function() return AvatarEditorService:SearchCatalog(params) end)
+    if ok and pages then
+        local s, list = pcall(function() return pages:GetCurrentPage() end)
+        if s and list and #list > 0 then
+            local out = {}
+            for _, v in ipairs(list) do
+                table.insert(out, {id = v.Id or v.AssetId, name = v.Name or "Emote"})
+            end
+            allEmotes = out
+            filteredEmotes = out
+            SaveEmoteCache(out)
+            print("[7yd7] Emotes carregados da API:", #out)
+            return
+        end
+    end
+
+    -- 4) Último recurso: defaults
+    allEmotes = deepCopy(DEFAULT_EMOTES)
+    filteredEmotes = deepCopy(DEFAULT_EMOTES)
+    print("[7yd7] Usando emotes padrão (fallback total)")
+end
+
+loadEmotesBlocking()
+
+-- =================== TRACK ===================
 local CurrentTrack = nil
 local function LoadTrack(id)
     if CurrentTrack then CurrentTrack:Stop(0.1) end
@@ -307,7 +336,6 @@ wheelFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 wheelFrame.BackgroundTransparency = 1
 wheelFrame.Parent = mainContainer
 
--- Barra superior
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.fromOffset(310, 32)
 topBar.AnchorPoint = Vector2.new(0.5, 1)
@@ -359,7 +387,6 @@ cartridgeButton.Parent = topBar
 
 cartridgeButton.MouseButton1Click:Connect(function() if selectedEmoteItem then openSaveModal() end end)
 
--- Barra inferior
 local navContainer = Instance.new("Frame")
 navContainer.Size = UDim2.fromOffset(200, 28)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
@@ -573,18 +600,16 @@ local function promptRenameCategory(oldName)
     local function finish(commit)
         if finished then return end
         finished = true
-        if commit and textBox.Text ~= "" and textBox.Text ~= oldName then
+        if commit and textBox.Text ~= "" and textBox.Text ~= oldName and not emoteData.Sets[textBox.Text] then
             local newName = textBox.Text
-            if not emoteData.Sets[newName] then
-                emoteData.Sets[newName] = emoteData.Sets[oldName]
-                emoteData.Sets[oldName] = nil
-                for i, n in ipairs(emoteData.Order) do
-                    if n == oldName then emoteData.Order[i] = newName; break end
-                end
-                if emoteData.Selected == oldName then emoteData.Selected = newName end
-                if currentCategory == oldName then currentCategory = newName end
-                SaveCategories()
+            emoteData.Sets[newName] = emoteData.Sets[oldName]
+            emoteData.Sets[oldName] = nil
+            for i, n in ipairs(emoteData.Order) do
+                if n == oldName then emoteData.Order[i] = newName; break end
             end
+            if emoteData.Selected == oldName then emoteData.Selected = newName end
+            if currentCategory == oldName then currentCategory = newName end
+            SaveCategories()
         end
         textBox:Destroy()
         buildCategoriesMenu()
@@ -601,8 +626,7 @@ local function MakeUniqueName(base, name)
 end
 
 createCatGlobalBtn.MouseButton1Click:Connect(function()
-    local base = "Nova Cat"
-    local name = MakeUniqueName(emoteData.Sets, base)
+    local name = MakeUniqueName(emoteData.Sets, "Nova Cat")
     emoteData.Sets[name] = { emotes = {} }
     table.insert(emoteData.Order, name)
     SaveCategories()
@@ -849,7 +873,7 @@ saveConfirmBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- =================== ELEMENTOS VISUAIS DA RODA ===================
+-- =================== ELEMENTOS DA RODA ===================
 local outerCircle = Instance.new("Frame")
 outerCircle.Size = UDim2.new(1, 0, 1, 0)
 outerCircle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -1043,36 +1067,15 @@ end
 
 loadPage = function(targetPage)
     local source = getSourceList()
-    if #source == 0 and #allEmotes == 0 then
-        -- fallback via AvatarEditorService se lista vazia
-        task.spawn(function()
-            local params = CatalogSearchParams.new()
-            params.SearchKeyword = currentKeyword
-            params.AssetTypes = { Enum.AvatarAssetType.EmoteAnimation }
-            params.SortType = Enum.CatalogSortType.RecentlyCreated
-            params.Limit = 30
-            local ok, pages = pcall(function() return AvatarEditorService:SearchCatalog(params) end)
-            if ok and pages then
-                local s, list = pcall(function() return pages:GetCurrentPage() end)
-                if s and list then
-                    local out = {}
-                    for _, v in ipairs(list) do
-                        table.insert(out, {Id = v.Id, AssetId = v.AssetId, Name = v.Name})
-                    end
-                    catalogItems = out
-                    totalPages = 1
-                    pageInfoLabel.Text = tostring(totalPages)
-                    updateWheelSlots()
-                end
-            end
-        end)
-        return
+
+    -- Proteção final (não deve ocorrer)
+    if #source == 0 then
+        source = deepCopy(DEFAULT_EMOTES)
+        allEmotes = source
+        filteredEmotes = source
     end
 
     totalPages = math.max(1, math.ceil(#source / 8))
-    if currentKeyword == "" and currentCategory == "All" and #source == #allEmotes and totalPages > DEFAULT_TOTAL_PAGES then
-        -- proteção: cap em DEFAULT pra não estourar
-    end
     if targetPage > totalPages then targetPage = totalPages end
     if targetPage < 1 then targetPage = 1 end
     currentPage = targetPage
@@ -1182,12 +1185,11 @@ buildCategoriesMenu = function()
             emoteData.Selected = name
             loadPage(1)
             buildCategoriesMenu()
-            -- ✅ Ajuste 3: sidePanel NÃO fecha ao trocar de categoria
+            -- ✅ Ajuste 3: sidePanel NÃO fecha
         end)
     end
 
-    local allCat = emoteData.Sets["All"]
-    createCatBtn("All", allCat and #allCat.emotes or 0, true)
+    createCatBtn("All", #allEmotes, true)
     for _, name in ipairs(emoteData.Order) do
         if name ~= "All" and emoteData.Sets[name] then
             createCatBtn(name, #emoteData.Sets[name].emotes, false)
@@ -1198,4 +1200,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Script integrado: busca local + favoritos {id,name} + persistência JSON + designs validados.")
+print("✅ Script integrado (Opção B): lista carregada ANTES de renderizar. Total: " .. tostring(#allEmotes))
