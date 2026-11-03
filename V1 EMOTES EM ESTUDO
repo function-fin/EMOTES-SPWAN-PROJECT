@@ -1,3 +1,14 @@
+--[[ 
+    Script: 7yd7 | Roda Radial de Emotes — HÍBRIDO DEFINITIVO
+    - JSON do 7yd7 (~40k emotes) + fallback API SearchCatalog
+    - Busca local multi-word instantânea + detecção de ID
+    - Cache local em 7yd7/EmoteListCache.json
+    - Auto-cache: emotes novos do API → disco
+    - Total de páginas real (math.ceil(#filtered/8))
+    - Designs validados preservados (Categorias + Modal Salvar)
+    - Ajustes: fechar ao usar / categoria não fecha / total dinâmico
+]]
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -20,6 +31,7 @@ end)
 
 local Settings = { Speed = 1, StopOnMove = true }
 
+-- Assets
 local ID_CARTUCHO_BORDA = "rbxassetid://96618641654782"
 local ID_CARTUCHO_SEMBORDA = "rbxassetid://96618641654782"
 local ID_BTN_DOCUMENTO = "rbxassetid://76204370315940"
@@ -35,7 +47,8 @@ local ID_SETA_DIREITA = "rbxassetid://138794689086376"
 
 local MARGIN = 12
 
-local FOLDER = "SPWAN"
+-- =================== PERSISTÊNCIA ===================
+local FOLDER = "7yd7"
 local EMOTE_CACHE_FILE = FOLDER .. "/EmoteListCache.json"
 local GITHUB_URL = "https://raw.githubusercontent.com/7yd7/sniper-Emote/refs/heads/test/EmoteSniper.json"
 local DEFAULT_TOTAL_PAGES = 7415
@@ -53,6 +66,7 @@ local function deepCopy(t)
     return c
 end
 
+-- =================== BANCO DE EMOTES ===================
 local allEmotes = {}
 local filteredEmotes = {}
 local emoteIndexById = {}
@@ -189,6 +203,7 @@ local function getEmoteName(id)
     return "Emote_" .. tostring(id)
 end
 
+-- =================== CARREGAMENTO BLOQUEANTE ===================
 print("[7yd7] Carregando emotes (bloqueante)...")
 local loaded = false
 
@@ -197,7 +212,7 @@ if cached then
     allEmotes = cached
     RebuildIndex()
     loaded = true
-    print("[SPWAN]", #allEmotes)
+    print("[7yd7] ✅ Cache local:", #allEmotes)
 end
 
 if not loaded then
@@ -208,12 +223,12 @@ if not loaded then
         RebuildIndex()
         SaveEmoteCache()
         loaded = true
-        print("[SPWAN]", #allEmotes)
+        print("[7yd7] ✅ GitHub:", #allEmotes)
     end
 end
 
 if not loaded then
-    print("[SPWAN] GitHub falhou, tentando API...")
+    print("[7yd7] GitHub falhou, tentando API...")
     local apiList = FetchFromAPI("")
     if apiList and #apiList > 0 then
         allEmotes = apiList
@@ -232,11 +247,12 @@ if not loaded then
         {id = 3360689775, name = "Salute"},
     }
     RebuildIndex()
-    print("[SPWAN]", #allEmotes)
+    print("[7yd7] ⚠️ Fallback mínimo:", #allEmotes)
 end
 
 filteredEmotes = allEmotes
 
+-- =================== STATE ===================
 local emoteData = { categories = {} }
 local CurrentTrack = nil
 local currentCategory = "All"
@@ -247,11 +263,13 @@ local selectedEmoteItem = nil
 local catalogItems = {}
 local slotButtons = {}
 local slotImages = {}
+local slotHighlights = {}
 local slotTexts = {}
 local searchToken = 0
 
 local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
 
+-- =================== TRACK ===================
 local function LoadTrack(id)
     if CurrentTrack then CurrentTrack:Stop(0.1) end
     local animId
@@ -288,6 +306,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- =================== PARENT GUI ===================
 local success, parentTarget = pcall(function()
     if gethui then return gethui()
     elseif syn and syn.protect_gui then
@@ -304,6 +323,7 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = parentTarget
 
+-- BOTÃO EXTERNO
 local toggleButton = Instance.new("ImageButton")
 toggleButton.Size = UDim2.new(0, 44, 0, 44)
 toggleButton.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -339,6 +359,7 @@ mainContainer.Parent = screenGui
 
 toggleButton.MouseButton1Click:Connect(function() mainContainer.Visible = not mainContainer.Visible end)
 
+-- RODA RADIAL
 local WHEEL_SIZE = 230
 local wheelFrame = Instance.new("Frame")
 wheelFrame.Size = UDim2.fromOffset(WHEEL_SIZE, WHEEL_SIZE)
@@ -347,6 +368,7 @@ wheelFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 wheelFrame.BackgroundTransparency = 1
 wheelFrame.Parent = mainContainer
 
+-- BARRA SUPERIOR
 local topBar = Instance.new("Frame")
 topBar.Size = UDim2.fromOffset(310, 32)
 topBar.AnchorPoint = Vector2.new(0.5, 1)
@@ -398,6 +420,7 @@ cartridgeButton.Parent = topBar
 
 cartridgeButton.MouseButton1Click:Connect(function() if selectedEmoteItem then openSaveModal() end end)
 
+-- BARRA INFERIOR
 local navContainer = Instance.new("Frame")
 navContainer.Size = UDim2.fromOffset(200, 28)
 navContainer.AnchorPoint = Vector2.new(0.5, 0)
@@ -413,9 +436,8 @@ navLayout.SortOrder = Enum.SortOrder.LayoutOrder
 navLayout.Padding = UDim.new(0, 6)
 navLayout.Parent = navContainer
 
--- ⬇️ SETAS +10% (22 -> 24 -> 26)
 local prevButton = Instance.new("ImageButton")
-prevButton.Size = UDim2.fromOffset(26, 26)
+prevButton.Size = UDim2.fromOffset(22, 22)
 prevButton.BackgroundTransparency = 1
 prevButton.Image = ID_SETA_ESQUERDA
 prevButton.LayoutOrder = 1
@@ -461,12 +483,15 @@ pageInfoLabel.LayoutOrder = 4
 pageInfoLabel.Parent = navContainer
 
 local nextButton = Instance.new("ImageButton")
-nextButton.Size = UDim2.fromOffset(26, 26)
+nextButton.Size = UDim2.fromOffset(22, 22)
 nextButton.BackgroundTransparency = 1
 nextButton.Image = ID_SETA_DIREITA
 nextButton.LayoutOrder = 5
 nextButton.Parent = navContainer
 
+-- ==========================================
+-- PAINEL LATERAL DE CATEGORIAS (150x230)
+-- ==========================================
 local sidePanel = Instance.new("Frame")
 sidePanel.Size = UDim2.fromOffset(150, 230)
 sidePanel.AnchorPoint = Vector2.new(1, 0.5)
@@ -644,6 +669,9 @@ removeCatGlobalBtn.MouseButton1Click:Connect(function()
     loadPage(1)
 end)
 
+-- ==========================================
+-- MODAL SALVAR (280x200)
+-- ==========================================
 local saveModal = Instance.new("Frame")
 saveModal.Size = UDim2.fromOffset(280, 200)
 saveModal.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -906,79 +934,8 @@ local innerRadius = radiusTotal * CENTER_RATIO
 local outerRadius = radiusTotal
 local slotLabelRadius = (innerRadius + outerRadius) / 2
 local TOTAL_SLOTS = 8
+
 local SLICE_ANGLE = 360 / TOTAL_SLOTS
-
--- ==========================================
--- HIGHLIGHTS DE FATIA — TÉCNICA ANTI-VAZAMENTO
--- Container circular + 8 frames retangulares rotacionados
--- O ClipsDescendants do container corta tudo que sai do círculo
--- ==========================================
-
-local highlightLayer = Instance.new("Frame")
-highlightLayer.Name = "HighlightLayer"
-highlightLayer.Size = UDim2.new(1, 0, 1, 0)
-highlightLayer.AnchorPoint = Vector2.new(0.5, 0.5)
-highlightLayer.Position = UDim2.new(0.5, 0, 0.5, 0)
-highlightLayer.BackgroundTransparency = 1
-highlightLayer.ClipsDescendants = true
-highlightLayer.ZIndex = 2
-highlightLayer.Parent = wheelFrame
-Instance.new("UICorner", highlightLayer).CornerRadius = UDim.new(0.5, 0)
-
--- Segundo clip: corta o "miolo" (círculo interno) — as fatias não invadem o centro
-local innerMask = Instance.new("Frame")
-innerMask.Name = "InnerMask"
-innerMask.Size = UDim2.new(CENTER_RATIO, 0, CENTER_RATIO, 0)
-innerMask.AnchorPoint = Vector2.new(0.5, 0.5)
-innerMask.Position = UDim2.new(0.5, 0, 0.5, 0)
-innerMask.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-innerMask.BackgroundTransparency = 0
-innerMask.ZIndex = 5
-innerMask.Parent = wheelFrame
-Instance.new("UICorner", innerMask).CornerRadius = UDim.new(0.5, 0)
-local innerMaskStroke = Instance.new("UIStroke", innerMask)
-innerMaskStroke.Color = Color3.fromRGB(0, 0, 0)
-innerMaskStroke.Thickness = 2
-
-local sliceHighlights = {}
-local NORMAL_TRANSPARENCY = 1
-local HOVER_TRANSPARENCY = 0.55
-local SELECTED_TRANSPARENCY = 0.35
-local activeTweens = {}
-
-for i = 1, TOTAL_SLOTS do
-    local sliceCenterDeg = ((i - 1) * SLICE_ANGLE) - 90
-    
-    -- Frame "cunha" retangular que parte do centro em direção à borda
-    -- Rotação faz ela "apontar" para a fatia i
-    local wedge = Instance.new("Frame")
-    wedge.Name = "SliceHighlight_" .. i
-    wedge.AnchorPoint = Vector2.new(0, 0.5)
-    wedge.Position = UDim2.new(0.5, 0, 0.5, 0)
-    -- Altura = 2 * radius * tan(22.5°) ≈ 0.4142 * radius
-    -- Mas para cobrir a fatia inteira visualmente, uso a largura = radius e altura generosa
-    wedge.Size = UDim2.fromOffset(radiusTotal + 2, radiusTotal * 0.9)
-    wedge.Rotation = sliceCenterDeg
-    wedge.BackgroundColor3 = Color3.fromRGB(175, 175, 175)
-    wedge.BackgroundTransparency = NORMAL_TRANSPARENCY
-    wedge.BorderSizePixel = 0
-    wedge.ZIndex = 2
-    wedge.Parent = highlightLayer
-    
-    -- Gradiente: escuro no centro → claro na borda (efeito da imagem)
-    local grad = Instance.new("UIGradient")
-    grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 90, 90)),      -- centro (mais escuro)
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(170, 170, 170)), -- meio
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 230, 230)),   -- borda (mais claro)
-    })
-    grad.Rotation = 0
-    grad.Parent = wedge
-    
-    sliceHighlights[i] = wedge
-end
-
--- Divisórias (linhas brancas entre fatias)
 for i = 1, TOTAL_SLOTS do
     local dividerAngleDeg = -90 + ((i - 1) * SLICE_ANGLE) - (SLICE_ANGLE / 2)
     local dividerAngleRad = math.rad(dividerAngleDeg)
@@ -1003,7 +960,6 @@ for i = 1, TOTAL_SLOTS do
     line.Parent = wheelFrame
 end
 
--- Slots (imagens dos emotes)
 for i = 1, TOTAL_SLOTS do
     local slotAngleDeg = ((i - 1) * SLICE_ANGLE) - 90
     local slotAngleRad = math.rad(slotAngleDeg)
@@ -1018,6 +974,16 @@ for i = 1, TOTAL_SLOTS do
     slotButton.Text = ""
     slotButton.ZIndex = 6
     slotButton.Parent = wheelFrame
+
+    local highlightBg = Instance.new("Frame")
+    highlightBg.Size = UDim2.new(1, 4, 1, 4)
+    highlightBg.AnchorPoint = Vector2.new(0.5, 0.5)
+    highlightBg.Position = UDim2.new(0.5, 0, 0.5, 0)
+    highlightBg.BackgroundColor3 = Color3.fromRGB(120, 120, 120)
+    highlightBg.BackgroundTransparency = 1
+    highlightBg.ZIndex = 5
+    highlightBg.Parent = slotButton
+    Instance.new("UICorner", highlightBg).CornerRadius = UDim.new(1, 0)
 
     local slotImg = Instance.new("ImageLabel")
     slotImg.Size = UDim2.new(1, -8, 1, -8)
@@ -1037,143 +1003,47 @@ for i = 1, TOTAL_SLOTS do
     slotText.ZIndex = 7
     slotText.Parent = slotButton
 
+    slotButton.MouseButton1Click:Connect(function()
+        local item = catalogItems[i]
+        if item then
+            for _, hl in pairs(slotHighlights) do
+                TweenService:Create(hl, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+            end
+            TweenService:Create(highlightBg, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.4}):Play()
+
+            slotImg.Size = UDim2.new(1, -8, 1, -8)
+            TweenService:Create(slotImg, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(1, -16, 1, -16)}):Play()
+            task.delay(0.15, function()
+                TweenService:Create(slotImg, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {Size = UDim2.new(1, -8, 1, -8)}):Play()
+            end)
+
+            selectedEmoteItem = item
+            centerText.Text = item.name or item.Name or "Emote"
+            cartridgeButton.Visible = true
+            LoadTrack(item.id or item.AssetId or item.Id)
+
+            -- ✅ Fecha toda interface
+            mainContainer.Visible = false
+        end
+    end)
+
     slotButtons[i] = slotButton
     slotImages[i] = slotImg
+    slotHighlights[i] = highlightBg
     slotTexts[i] = slotText
 end
-
--- ==========================================
--- HITBOX RADIAL + HOVER/DRAG
--- ==========================================
-local hoveredSlot = nil
-local selectedSlot = nil
-local activeTouch = nil
-
-local function GetRadialSlot(screenPosition)
-    local wheelPosition = wheelFrame.AbsolutePosition
-    local wheelSize = wheelFrame.AbsoluteSize
-
-    local center = Vector2.new(wheelSize.X / 2, wheelSize.Y / 2)
-    local localPosition = Vector2.new(screenPosition.X - wheelPosition.X, screenPosition.Y - wheelPosition.Y)
-
-    local delta = localPosition - center
-    local distance = delta.Magnitude
-
-    local outerR = math.min(wheelSize.X, wheelSize.Y) / 2
-    local innerR = outerR * CENTER_RATIO
-
-    if distance < innerR or distance > outerR then
-        return nil
-    end
-
-    local angle = math.deg(math.atan2(delta.Y, delta.X))
-    angle = (angle + 360) % 360
-
-    local adjustedAngle = (angle + 112.5) % 360
-    local slot = math.floor(adjustedAngle / 45) + 1
-    return slot
-end
-
-local function UpdateSliceVisuals()
-    for i = 1, TOTAL_SLOTS do
-        local slice = sliceHighlights[i]
-        local targetTransparency = NORMAL_TRANSPARENCY
-
-        if i == selectedSlot then
-            targetTransparency = SELECTED_TRANSPARENCY
-        end
-        if i == hoveredSlot then
-            targetTransparency = math.min(targetTransparency, HOVER_TRANSPARENCY)
-        end
-
-        if activeTweens[i] then activeTweens[i]:Cancel() end
-        local tween = TweenService:Create(slice, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            BackgroundTransparency = targetTransparency
-        })
-        activeTweens[i] = tween
-        tween:Play()
-    end
-end
-
-local function SelectRadialSlot(slot)
-    if not slot then return end
-    selectedSlot = slot
-    UpdateSliceVisuals()
-
-    local item = catalogItems[slot]
-    if item then
-        selectedEmoteItem = item
-        centerText.Text = item.name or item.Name or "Emote"
-        cartridgeButton.Visible = true
-        LoadTrack(item.id or item.AssetId or item.Id)
-        mainContainer.Visible = false
-    end
-end
-
--- Detecção de mouse
-UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-    if not wheelFrame.Visible or not mainContainer.Visible then return end
-    if activeTouch then return end
-    local s = GetRadialSlot(input.Position)
-    if s ~= hoveredSlot then
-        hoveredSlot = s
-        UpdateSliceVisuals()
-    end
-end)
-
-UserInputService.InputBegan:Connect(function(input)
-    if not wheelFrame.Visible or not mainContainer.Visible then return end
-
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        local s = GetRadialSlot(input.Position)
-        if s then SelectRadialSlot(s) end
-    elseif input.UserInputType == Enum.UserInputType.Touch then
-        activeTouch = input
-        local s = GetRadialSlot(input.Position)
-        if s then
-            hoveredSlot = s
-            UpdateSliceVisuals()
-        end
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if not activeTouch then return end
-    if input.UserInputType ~= Enum.UserInputType.Touch then return end
-    local s = GetRadialSlot(input.Position)
-    if s ~= hoveredSlot then
-        hoveredSlot = s
-        UpdateSliceVisuals()
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input ~= activeTouch then return end
-    local s = GetRadialSlot(input.Position)
-    if s then SelectRadialSlot(s) end
-    activeTouch = nil
-    hoveredSlot = nil
-    UpdateSliceVisuals()
-end)
-
--- Sair com mouse da roda → apaga hover
-UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-    if activeTouch then return end
-    if not wheelFrame.Visible or not mainContainer.Visible then return end
-    local s = GetRadialSlot(input.Position)
-    if s == nil and hoveredSlot ~= nil then
-        hoveredSlot = nil
-        UpdateSliceVisuals()
-    end
-end)
 
 local function updateWheelSlots()
     for i = 1, TOTAL_SLOTS do
         local item = catalogItems[i]
         local img = slotImages[i]
         local txt = slotTexts[i]
+        local hl = slotHighlights[i]
+
+        if hl then
+            TweenService:Create(hl, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+        end
+
         if item then
             txt.Visible = false
             local eid = item.id or item.AssetId or item.Id
@@ -1187,12 +1057,17 @@ local function updateWheelSlots()
     end
 end
 
+-- ==========================================
+-- loadPage HÍBRIDO
+-- ==========================================
 loadPage = function(targetPage)
     searchToken = searchToken + 1
     local myToken = searchToken
 
+    -- PASSO 1: busca local (instantânea)
     local localCount = applySearchLocal(currentKeyword)
 
+    -- Se categoria ≠ "All", filtra pelos IDs salvos
     if currentCategory ~= "All" then
         local catSet = {}
         for _, cat in ipairs(emoteData.categories) do
@@ -1229,6 +1104,7 @@ loadPage = function(targetPage)
     end
     updateWheelSlots()
 
+    -- PASSO 2: fallback API se local < 8 e há keyword e categoria é All
     if localCount < 8 and currentKeyword ~= "" and currentCategory == "All" then
         task.spawn(function()
             local apiList = FetchFromAPI(currentKeyword)
@@ -1298,6 +1174,10 @@ searchBox.FocusLost:Connect(function()
     loadPage(currentPage)
 end)
 
+-- ==========================================
+-- buildCategoriesMenu (visual novo, 150x230)
+-- Clicar em categoria NÃO fecha o painel
+-- ==========================================
 buildCategoriesMenu = function()
     for _, child in ipairs(sideScrolling:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
@@ -1373,11 +1253,14 @@ buildCategoriesMenu = function()
         arrow.Parent = btn
 
         btn.MouseButton1Click:Connect(function()
-            if currentCategory == name and not isAll then return end
+            if currentCategory == name and not isAll then
+                return
+            end
             currentCategory = name
             currentPage = 1
             loadPage(currentPage)
             buildCategoriesMenu()
+            -- ✅ sidePanel NÃO fecha ao trocar de categoria
         end)
     end
 
@@ -1389,3 +1272,5 @@ end
 
 buildCategoriesMenu()
 loadPage(1)
+
+print("✅ Script híbrido carregado. Emotes no DB:", #allEmotes)
