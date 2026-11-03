@@ -1,15 +1,20 @@
 --[[ 
-    Script: 7yd7 | Roda Radial de Emotes
-    - Designs corrigidos integrados (Categorias + Modal de Salvar)
-    - Contagem dinâmica de páginas por busca (via estimativa progressiva)
-    - Fechar interface ao selecionar emote
-    - Trocar categoria não fecha painel
+    Script: 7yd7 | Roda Radial de Emotes — HÍBRIDO DEFINITIVO
+    - JSON do 7yd7 (~40k emotes) + fallback API SearchCatalog
+    - Busca local multi-word instantânea + detecção de ID
+    - Cache local em 7yd7/EmoteListCache.json
+    - Auto-cache: emotes novos do API → disco
+    - Total de páginas real (math.ceil(#filtered/8))
+    - Designs validados preservados (Categorias + Modal Salvar)
+    - Ajustes: fechar ao usar / categoria não fecha / total dinâmico
 ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local AvatarEditorService = game:GetService("AvatarEditorService")
+local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
 
@@ -26,27 +31,245 @@ end)
 
 local Settings = { Speed = 1, StopOnMove = true }
 
+-- Assets
 local ID_CARTUCHO_BORDA = "rbxassetid://96618641654782"
 local ID_CARTUCHO_SEMBORDA = "rbxassetid://96618641654782"
 local ID_BTN_DOCUMENTO = "rbxassetid://76204370315940"
 local ID_BTN_EXTERNO = "rbxassetid://115103675836200"
-
--- Ícones
 local ID_ICONE_SOL = "rbxassetid://77667780640343"
 local ID_SIMBOLO_MAIS = "rbxassetid://85682941433471"
 local ID_SIMBOLO_LIXEIRA = "rbxassetid://78774633521849"
 local ID_CARTUCHO_SALVAR = "rbxassetid://103168629250780"
 local ID_FECHAR_X = "rbxassetid://78774633521849"
 local ID_LAPIS = "rbxassetid://105157650009654"
-
 local ID_SETA_ESQUERDA = "rbxassetid://112363067871003"
 local ID_SETA_DIREITA = "rbxassetid://138794689086376"
 
 local MARGIN = 12
 
+-- =================== PERSISTÊNCIA ===================
+local FOLDER = "7yd7"
+local EMOTE_CACHE_FILE = FOLDER .. "/EmoteListCache.json"
+local GITHUB_URL = "https://raw.githubusercontent.com/7yd7/sniper-Emote/refs/heads/test/EmoteSniper.json"
+local DEFAULT_TOTAL_PAGES = 7415
+
+local function ensureFolder()
+    if isfolder and not isfolder(FOLDER) then
+        pcall(function() makefolder(FOLDER) end)
+    end
+end
+
+local function deepCopy(t)
+    if type(t) ~= "table" then return t end
+    local c = {}
+    for k, v in pairs(t) do c[k] = deepCopy(v) end
+    return c
+end
+
+-- =================== BANCO DE EMOTES ===================
+local allEmotes = {}
+local filteredEmotes = {}
+local emoteIndexById = {}
+
+local function LoadEmoteCache()
+    ensureFolder()
+    if isfile and isfile(EMOTE_CACHE_FILE) then
+        local ok, decoded = pcall(function()
+            return HttpService:JSONDecode(readfile(EMOTE_CACHE_FILE))
+        end)
+        if ok and type(decoded) == "table" and #decoded > 0 then
+            return decoded
+        end
+    end
+    return nil
+end
+
+local function SaveEmoteCache()
+    ensureFolder()
+    if writefile then
+        pcall(function()
+            writefile(EMOTE_CACHE_FILE, HttpService:JSONEncode(allEmotes))
+        end)
+    end
+end
+
+local function FetchFromGitHub()
+    local ok, result = pcall(function()
+        local json = game:HttpGet(GITHUB_URL)
+        if json and json ~= "" then
+            return HttpService:JSONDecode(json)
+        end
+        return nil
+    end)
+    if ok and result and result.data then
+        local out = {}
+        for _, item in ipairs(result.data) do
+            local id = tonumber(item.id)
+            if id and id > 0 then
+                table.insert(out, {id = id, name = item.name or ("Emote_" .. id)})
+            end
+        end
+        if #out > 0 then return out end
+    end
+    return nil
+end
+
+local function FetchFromAPI(keyword)
+    local out = {}
+    local ok, pages = pcall(function()
+        local params = CatalogSearchParams.new()
+        params.SearchKeyword = keyword or ""
+        params.AssetTypes = { Enum.AvatarAssetType.EmoteAnimation }
+        params.SortType = Enum.CatalogSortType.RecentlyCreated
+        params.Limit = 120
+        return AvatarEditorService:SearchCatalog(params)
+    end)
+    if ok and pages then
+        local s, list = pcall(function() return pages:GetCurrentPage() end)
+        if s and list then
+            for _, v in ipairs(list) do
+                local id = tonumber(v.Id or v.AssetId)
+                if id then
+                    table.insert(out, {id = id, name = v.Name or ("Emote_" .. id)})
+                end
+            end
+        end
+    end
+    return out
+end
+
+local function RebuildIndex()
+    emoteIndexById = {}
+    for _, e in ipairs(allEmotes) do
+        emoteIndexById[tostring(e.id)] = e
+    end
+end
+
+local function smartSearchMatch(name, term)
+    if not term or term == "" then return true end
+    name = tostring(name):lower()
+    term = tostring(term):lower()
+    for word in term:gmatch("%S+") do
+        if not name:find(word, 1, true) then return false end
+    end
+    return true
+end
+
+local function applySearchLocal(term)
+    term = tostring(term or ""):lower()
+    if term == "" then
+        filteredEmotes = allEmotes
+        return #filteredEmotes
+    end
+    local isId = term:match("^%d+$")
+    if isId then
+        local item = emoteIndexById[term]
+        if item then
+            filteredEmotes = {item}
+            return 1
+        end
+        filteredEmotes = {}
+        return 0
+    end
+    local out = {}
+    for _, e in ipairs(allEmotes) do
+        if smartSearchMatch(e.name, term) then
+            table.insert(out, e)
+        end
+    end
+    filteredEmotes = out
+    return #out
+end
+
+local function mergeNoDupes(listA, listB)
+    local seen = {}
+    local out = {}
+    for _, e in ipairs(listA) do
+        local k = tostring(e.id)
+        if not seen[k] then seen[k] = true; table.insert(out, e) end
+    end
+    for _, e in ipairs(listB) do
+        local k = tostring(e.id)
+        if not seen[k] then seen[k] = true; table.insert(out, e) end
+    end
+    return out
+end
+
+local function getEmoteName(id)
+    local ok, info = pcall(function()
+        return MarketplaceService:GetProductInfo(tonumber(id))
+    end)
+    if ok and info and info.Name then return info.Name end
+    return "Emote_" .. tostring(id)
+end
+
+-- =================== CARREGAMENTO BLOQUEANTE ===================
+print("[7yd7] Carregando emotes (bloqueante)...")
+local loaded = false
+
+local cached = LoadEmoteCache()
+if cached then
+    allEmotes = cached
+    RebuildIndex()
+    loaded = true
+    print("[7yd7] ✅ Cache local:", #allEmotes)
+end
+
+if not loaded then
+    print("[7yd7] Cache vazio, baixando do GitHub...")
+    local githubList = FetchFromGitHub()
+    if githubList then
+        allEmotes = githubList
+        RebuildIndex()
+        SaveEmoteCache()
+        loaded = true
+        print("[7yd7] ✅ GitHub:", #allEmotes)
+    end
+end
+
+if not loaded then
+    print("[7yd7] GitHub falhou, tentando API...")
+    local apiList = FetchFromAPI("")
+    if apiList and #apiList > 0 then
+        allEmotes = apiList
+        RebuildIndex()
+        SaveEmoteCache()
+        loaded = true
+        print("[7yd7] ✅ API:", #allEmotes)
+    end
+end
+
+if not loaded then
+    allEmotes = {
+        {id = 3360686498, name = "Stadium"},
+        {id = 3360692915, name = "Tilt"},
+        {id = 3576968026, name = "Shrug"},
+        {id = 3360689775, name = "Salute"},
+    }
+    RebuildIndex()
+    print("[7yd7] ⚠️ Fallback mínimo:", #allEmotes)
+end
+
+filteredEmotes = allEmotes
+
+-- =================== STATE ===================
 local emoteData = { categories = {} }
 local CurrentTrack = nil
+local currentCategory = "All"
+local currentPage = 1
+local totalPages = DEFAULT_TOTAL_PAGES
+local currentKeyword = ""
+local selectedEmoteItem = nil
+local catalogItems = {}
+local slotButtons = {}
+local slotImages = {}
+local slotHighlights = {}
+local slotTexts = {}
+local searchToken = 0
 
+local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
+
+-- =================== TRACK ===================
 local function LoadTrack(id)
     if CurrentTrack then CurrentTrack:Stop(0.1) end
     local animId
@@ -83,6 +306,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- =================== PARENT GUI ===================
 local success, parentTarget = pcall(function()
     if gethui then return gethui()
     elseif syn and syn.protect_gui then
@@ -94,7 +318,7 @@ end)
 if not success or not parentTarget then parentTarget = Players.LocalPlayer:WaitForChild("PlayerGui") end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EmoteRadialGui_Final"
+screenGui.Name = "EmoteRadialGui_Hybrid"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = parentTarget
@@ -134,20 +358,6 @@ mainContainer.Visible = true
 mainContainer.Parent = screenGui
 
 toggleButton.MouseButton1Click:Connect(function() mainContainer.Visible = not mainContainer.Visible end)
-
-local currentCategory = "All"
-local currentPage = 1
-local DEFAULT_TOTAL_PAGES = 7415
-local totalPages = DEFAULT_TOTAL_PAGES
-local currentKeyword = ""
-local selectedEmoteItem = nil
-local catalogItems = {}
-local slotButtons = {}
-local slotImages = {}
-local slotHighlights = {}
-local slotTexts = {}
-
-local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
 
 -- RODA RADIAL
 local WHEEL_SIZE = 230
@@ -280,8 +490,7 @@ nextButton.LayoutOrder = 5
 nextButton.Parent = navContainer
 
 -- ==========================================
--- PAINEL LATERAL DE CATEGORIAS (visual novo)
--- Tamanho original preservado: 150x230
+-- PAINEL LATERAL DE CATEGORIAS (150x230)
 -- ==========================================
 local sidePanel = Instance.new("Frame")
 sidePanel.Size = UDim2.fromOffset(150, 230)
@@ -461,7 +670,7 @@ removeCatGlobalBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- MODAL SALVAR (visual novo, 280x200)
+-- MODAL SALVAR (280x200)
 -- ==========================================
 local saveModal = Instance.new("Frame")
 saveModal.Size = UDim2.fromOffset(280, 200)
@@ -664,14 +873,18 @@ saveConfirmText.Parent = saveConfirmBtn
 
 saveConfirmBtn.MouseButton1Click:Connect(function()
     if selectedEmoteItem and targetCategoryToSave then
-        local id = tostring(selectedEmoteItem.AssetId or selectedEmoteItem.Id)
+        local id = tostring(selectedEmoteItem.AssetId or selectedEmoteItem.Id or selectedEmoteItem.id)
+        local name = selectedEmoteItem.Name or selectedEmoteItem.name or getEmoteName(id)
         for _, cat in ipairs(emoteData.categories) do
             if cat.name == targetCategoryToSave then
                 local exists = false
-                for _, emoteId in ipairs(cat.emotes) do
-                    if tostring(emoteId) == id then exists = true; break end
+                for _, entry in ipairs(cat.emotes) do
+                    local eid = type(entry) == "table" and tostring(entry.id or entry) or tostring(entry)
+                    if eid == id then exists = true; break end
                 end
-                if not exists then table.insert(cat.emotes, id) end
+                if not exists then
+                    table.insert(cat.emotes, {id = tonumber(id) or id, name = name})
+                end
                 break
             end
         end
@@ -722,7 +935,6 @@ local outerRadius = radiusTotal
 local slotLabelRadius = (innerRadius + outerRadius) / 2
 local TOTAL_SLOTS = 8
 
--- Linhas divisórias
 local SLICE_ANGLE = 360 / TOTAL_SLOTS
 for i = 1, TOTAL_SLOTS do
     local dividerAngleDeg = -90 + ((i - 1) * SLICE_ANGLE) - (SLICE_ANGLE / 2)
@@ -748,7 +960,6 @@ for i = 1, TOTAL_SLOTS do
     line.Parent = wheelFrame
 end
 
--- Slots de Emotes
 for i = 1, TOTAL_SLOTS do
     local slotAngleDeg = ((i - 1) * SLICE_ANGLE) - 90
     local slotAngleRad = math.rad(slotAngleDeg)
@@ -798,7 +1009,6 @@ for i = 1, TOTAL_SLOTS do
             for _, hl in pairs(slotHighlights) do
                 TweenService:Create(hl, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
             end
-
             TweenService:Create(highlightBg, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {BackgroundTransparency = 0.4}):Play()
 
             slotImg.Size = UDim2.new(1, -8, 1, -8)
@@ -808,11 +1018,11 @@ for i = 1, TOTAL_SLOTS do
             end)
 
             selectedEmoteItem = item
-            centerText.Text = item.Name or "Emote"
+            centerText.Text = item.name or item.Name or "Emote"
             cartridgeButton.Visible = true
-            LoadTrack(item.AssetId or item.Id)
+            LoadTrack(item.id or item.AssetId or item.Id)
 
-            -- ✅ NOVO: fecha toda a interface ao selecionar um emote
+            -- ✅ Fecha toda interface
             mainContainer.Visible = false
         end
     end)
@@ -836,7 +1046,8 @@ local function updateWheelSlots()
 
         if item then
             txt.Visible = false
-            img.Image = "rbxthumb://type=Asset&id=" .. tostring(item.AssetId or item.Id) .. "&w=150&h=150"
+            local eid = item.id or item.AssetId or item.Id
+            img.Image = "rbxthumb://type=Asset&id=" .. tostring(eid) .. "&w=150&h=150"
             img.Visible = true
         else
             txt.Visible = true
@@ -847,78 +1058,89 @@ local function updateWheelSlots()
 end
 
 -- ==========================================
--- loadPage — Contagem dinâmica de páginas
--- Estratégia: acumula a página atual + 3 páginas seguintes (até 480 itens)
--- Calcula totalPages com base no que achou (estimativa progressiva)
+-- loadPage HÍBRIDO
 -- ==========================================
 loadPage = function(targetPage)
-    task.spawn(function()
-        local params = CatalogSearchParams.new()
-        params.SearchKeyword = currentKeyword
-        params.AssetTypes = { Enum.AvatarAssetType.EmoteAnimation }
-        params.SortType = Enum.CatalogSortType.RecentlyCreated
-        params.Limit = 120
+    searchToken = searchToken + 1
+    local myToken = searchToken
 
-        local ok, pages = pcall(function() return AvatarEditorService:SearchCatalog(params) end)
-        if ok and pages then
-            local allFetched = {}
+    -- PASSO 1: busca local (instantânea)
+    local localCount = applySearchLocal(currentKeyword)
 
-            -- Página atual
-            local s, list = pcall(function() return pages:GetCurrentPage() end)
-            if s and list then
-                for _, v in ipairs(list) do table.insert(allFetched, v) end
-            end
-
-            -- + 3 páginas seguintes
-            for _ = 1, 3 do
-                if pages.IsFinished then break end
-                pcall(function() pages:AdvanceToNextPageAsync() end)
-                s, list = pcall(function() return pages:GetCurrentPage() end)
-                if s and list then
-                    for _, v in ipairs(list) do table.insert(allFetched, v) end
+    -- Se categoria ≠ "All", filtra pelos IDs salvos
+    if currentCategory ~= "All" then
+        local catSet = {}
+        for _, cat in ipairs(emoteData.categories) do
+            if cat.name == currentCategory then
+                for _, entry in ipairs(cat.emotes) do
+                    local eid = type(entry) == "table" and tostring(entry.id or entry) or tostring(entry)
+                    catSet[eid] = true
                 end
+                break
             end
+        end
+        local filtered = {}
+        for _, e in ipairs(filteredEmotes) do
+            local eid = tostring(e.id or e.AssetId or e.Id)
+            if catSet[eid] then table.insert(filtered, e) end
+        end
+        filteredEmotes = filtered
+        localCount = #filteredEmotes
+    end
 
-            -- Filtra por categoria (se não for "All")
-            local sourceList = allFetched
-            if currentCategory ~= "All" then
-                local catSet = {}
-                for _, cat in ipairs(emoteData.categories) do
-                    if cat.name == currentCategory then
-                        for _, id in ipairs(cat.emotes) do catSet[tostring(id)] = true end
-                        break
+    totalPages = math.max(1, math.ceil(localCount / 8))
+    if targetPage > totalPages then targetPage = totalPages end
+    if targetPage < 1 then targetPage = 1 end
+    currentPage = targetPage
+    pageTextBox.Text = tostring(currentPage)
+    pageInfoLabel.Text = tostring(totalPages)
+
+    catalogItems = {}
+    local startIdx = (currentPage - 1) * 8 + 1
+    for j = 0, 7 do
+        if filteredEmotes[startIdx + j] then
+            table.insert(catalogItems, filteredEmotes[startIdx + j])
+        end
+    end
+    updateWheelSlots()
+
+    -- PASSO 2: fallback API se local < 8 e há keyword e categoria é All
+    if localCount < 8 and currentKeyword ~= "" and currentCategory == "All" then
+        task.spawn(function()
+            local apiList = FetchFromAPI(currentKeyword)
+            if myToken ~= searchToken then return end
+
+            if #apiList > 0 then
+                local merged = mergeNoDupes(filteredEmotes, apiList)
+                filteredEmotes = merged
+                totalPages = math.max(1, math.ceil(#merged / 8))
+
+                local added = false
+                for _, novo in ipairs(apiList) do
+                    if not emoteIndexById[tostring(novo.id)] then
+                        table.insert(allEmotes, novo)
+                        emoteIndexById[tostring(novo.id)] = novo
+                        added = true
                     end
                 end
-                sourceList = {}
-                for _, v in ipairs(allFetched) do
-                    if catSet[tostring(v.AssetId or v.Id)] then table.insert(sourceList, v) end
-                end
-            end
+                if added then SaveEmoteCache() end
 
-            -- Calcula totalPages
-            if #sourceList > 0 then
-                if currentKeyword == "" and currentCategory == "All" then
-                    totalPages = DEFAULT_TOTAL_PAGES
-                else
-                    totalPages = math.max(1, math.ceil(#sourceList / 8))
-                end
-            else
-                totalPages = 1
-            end
+                if targetPage > totalPages then targetPage = totalPages end
+                currentPage = targetPage
+                pageTextBox.Text = tostring(currentPage)
+                pageInfoLabel.Text = tostring(totalPages)
 
-            -- Extrai os 8 emotes da página alvo
-            catalogItems = {}
-            local startIndex = ((targetPage - 1) * 8) + 1
-            for j = 1, 8 do
-                if sourceList[startIndex + j - 1] then
-                    table.insert(catalogItems, sourceList[startIndex + j - 1])
+                catalogItems = {}
+                local newStart = (currentPage - 1) * 8 + 1
+                for j = 0, 7 do
+                    if filteredEmotes[newStart + j] then
+                        table.insert(catalogItems, filteredEmotes[newStart + j])
+                    end
                 end
+                updateWheelSlots()
             end
-
-            updateWheelSlots()
-            pageInfoLabel.Text = tostring(totalPages)  -- atualiza contador de páginas
-        end
-    end)
+        end)
+    end
 end
 
 prevButton.MouseButton1Click:Connect(function()
@@ -954,7 +1176,7 @@ end)
 
 -- ==========================================
 -- buildCategoriesMenu (visual novo, 150x230)
--- ✅ NOVO: clicar em categoria NÃO fecha o painel
+-- Clicar em categoria NÃO fecha o painel
 -- ==========================================
 buildCategoriesMenu = function()
     for _, child in ipairs(sideScrolling:GetChildren()) do
@@ -1038,11 +1260,11 @@ buildCategoriesMenu = function()
             currentPage = 1
             loadPage(currentPage)
             buildCategoriesMenu()
-            -- ✅ NOVO: sidePanel NÃO fecha ao trocar de categoria
+            -- ✅ sidePanel NÃO fecha ao trocar de categoria
         end)
     end
 
-    createCatBtn("All", 0, true)
+    createCatBtn("All", #allEmotes, true)
     for _, cat in ipairs(emoteData.categories) do
         createCatBtn(cat.name, #cat.emotes, false)
     end
@@ -1051,4 +1273,4 @@ end
 buildCategoriesMenu()
 loadPage(1)
 
-print("✅ Script integrado com designs corrigidos + contagem dinâmica + fechamento ao usar emote.")
+print("✅ Script híbrido carregado. Emotes no DB:", #allEmotes)
