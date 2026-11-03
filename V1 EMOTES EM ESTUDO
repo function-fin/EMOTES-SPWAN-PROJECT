@@ -247,7 +247,6 @@ local selectedEmoteItem = nil
 local catalogItems = {}
 local slotButtons = {}
 local slotImages = {}
-local slotHighlights = {}
 local slotTexts = {}
 local searchToken = 0
 
@@ -414,8 +413,9 @@ navLayout.SortOrder = Enum.SortOrder.LayoutOrder
 navLayout.Padding = UDim.new(0, 6)
 navLayout.Parent = navContainer
 
+-- ⬇️ SETAS +10% (22 -> 24 -> 26)
 local prevButton = Instance.new("ImageButton")
-prevButton.Size = UDim2.fromOffset(24, 24) -- +10% (era 22)
+prevButton.Size = UDim2.fromOffset(26, 26)
 prevButton.BackgroundTransparency = 1
 prevButton.Image = ID_SETA_ESQUERDA
 prevButton.LayoutOrder = 1
@@ -461,7 +461,7 @@ pageInfoLabel.LayoutOrder = 4
 pageInfoLabel.Parent = navContainer
 
 local nextButton = Instance.new("ImageButton")
-nextButton.Size = UDim2.fromOffset(24, 24) -- +10% (era 22)
+nextButton.Size = UDim2.fromOffset(26, 26)
 nextButton.BackgroundTransparency = 1
 nextButton.Image = ID_SETA_DIREITA
 nextButton.LayoutOrder = 5
@@ -906,103 +906,17 @@ local innerRadius = radiusTotal * CENTER_RATIO
 local outerRadius = radiusTotal
 local slotLabelRadius = (innerRadius + outerRadius) / 2
 local TOTAL_SLOTS = 8
-
 local SLICE_ANGLE = 360 / TOTAL_SLOTS
 
 -- ==========================================
--- HIGHLIGHTS EM FORMATO DE FATIA (pizza)
+-- HIGHLIGHTS DE FATIA — TÉCNICA ANTI-VAZAMENTO
+-- Container circular + 8 frames retangulares rotacionados
+-- O ClipsDescendants do container corta tudo que sai do círculo
 -- ==========================================
-local sliceHighlights = {}
 
-for i = 1, TOTAL_SLOTS do
-    -- Container que gira pra posicionar a fatia no ângulo correto
-    local sliceContainer = Instance.new("Frame")
-    sliceContainer.Name = "SliceContainer_" .. i
-    sliceContainer.Size = UDim2.fromOffset(WHEEL_SIZE, WHEEL_SIZE)
-    sliceContainer.AnchorPoint = Vector2.new(0.5, 0.5)
-    sliceContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
-    sliceContainer.BackgroundTransparency = 1
-    sliceContainer.ZIndex = 2
-    sliceContainer.ClipsDescendants = false
-    sliceContainer.Parent = wheelFrame
-    
-    -- Ângulo central da fatia i (fatia 1 = topo)
-    local sliceCenterDeg = ((i - 1) * SLICE_ANGLE) - 90
-    sliceContainer.Rotation = sliceCenterDeg + (SLICE_ANGLE / 2)
-    
-    -- Clip frame para cortar em forma de fatia
-    local clip = Instance.new("Frame")
-    clip.Name = "SliceClip"
-    clip.Size = UDim2.fromOffset(radiusTotal, radiusTotal)  -- metade da roda
-    clip.AnchorPoint = Vector2.new(0, 0.5)
-    clip.Position = UDim2.new(0.5, 0, 0.5, 0)
-    clip.BackgroundTransparency = 1
-    clip.ClipsDescendants = true
-    clip.ZIndex = 2
-    clip.Parent = sliceContainer
-    Instance.new("UICorner", clip).CornerRadius = UDim.new(0, 0)
-    
-    -- Retângulo de highlight (do centro até a borda) — vai ser clipado
-    -- A "fatia" real é feita pelo clip + rotation
-    local wedge = Instance.new("Frame")
-    wedge.Name = "Wedge"
-    wedge.Size = UDim2.fromOffset(radiusTotal, radiusTotal)
-    wedge.AnchorPoint = Vector2.new(0, 0.5)
-    wedge.Position = UDim2.new(0, 0, 0.5, 0)
-    wedge.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-    wedge.BackgroundTransparency = 1
-    wedge.BorderSizePixel = 0
-    wedge.ZIndex = 2
-    wedge.Parent = clip
-    
-    -- Gradiente (borda escura no externo, transparente no centro)
-    local gradient = Instance.new("UIGradient")
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(140, 140, 140)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200, 200, 200)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 220, 220)),
-    })
-    gradient.Rotation = 0
-    gradient.Parent = wedge
-    
-    -- Máscara circular externa: como a wedge é retângulo, precisamos cortar
-    -- a ponta externa pra ficar dentro do círculo. Vamos usar outro clip.
-    -- Solução: a wedge fica dentro do clip (retângulo) e o clip tem a borda circular
-    -- Aplicamos UICorner circular no outerCircle apenas; a wedge é retangular clipada
-    -- Para arredondar a borda externa, colocamos um segundo clip circular na ponta.
-    
-    -- Simplificação: em vez de clip complexo, desenhamos a wedge já com rotação
-    -- e o "arredondamento" externo vem do próprio outerCircle (que está por baixo).
-    -- Como a wedge é filha do clip (que fica dentro da wheelFrame), a parte que
-    -- "escapa" do círculo ainda é renderizada. Para cortar, fazemos o clip ter
-    -- uma máscara circular através de outro frame.
-    
-    sliceHighlights[i] = wedge
-end
-
--- Ajuste: em vez de fazer wedge retangular + clip complicado,
--- vamos desenhar cada fatia com 2 frames triangulares simulando o setor.
--- Técnica: um frame com rotation é um retângulo; o setor de pizza é formado
--- por um triângulo que parte do centro. Como Roblox não tem triângulo nativo,
--- usamos a técnica de clip: rectangle wedge + rotation = setor visual aproximado.
-
--- Reconstruindo highlights de forma mais simples e eficaz:
-for i = 1, TOTAL_SLOTS do
-    if sliceHighlights[i] then
-        sliceHighlights[i].Parent.Parent:Destroy()
-    end
-end
-
--- Nova abordagem: ImageLabel com gradiente + rotação por fatia
--- Vamos usar UICorner no wedger e ClipDescendants no outerCircle
-
--- Como outerCircle não tem ClipsDescendants, ativamos:
-outerCircle.ClipsDescendants = true
-
--- Reconstruir com clip circular usando um frame do tamanho da roda
 local highlightLayer = Instance.new("Frame")
 highlightLayer.Name = "HighlightLayer"
-highlightLayer.Size = UDim2.fromOffset(WHEEL_SIZE, WHEEL_SIZE)
+highlightLayer.Size = UDim2.new(1, 0, 1, 0)
 highlightLayer.AnchorPoint = Vector2.new(0.5, 0.5)
 highlightLayer.Position = UDim2.new(0.5, 0, 0.5, 0)
 highlightLayer.BackgroundTransparency = 1
@@ -1011,38 +925,60 @@ highlightLayer.ZIndex = 2
 highlightLayer.Parent = wheelFrame
 Instance.new("UICorner", highlightLayer).CornerRadius = UDim.new(0.5, 0)
 
-sliceHighlights = {}
+-- Segundo clip: corta o "miolo" (círculo interno) — as fatias não invadem o centro
+local innerMask = Instance.new("Frame")
+innerMask.Name = "InnerMask"
+innerMask.Size = UDim2.new(CENTER_RATIO, 0, CENTER_RATIO, 0)
+innerMask.AnchorPoint = Vector2.new(0.5, 0.5)
+innerMask.Position = UDim2.new(0.5, 0, 0.5, 0)
+innerMask.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+innerMask.BackgroundTransparency = 0
+innerMask.ZIndex = 5
+innerMask.Parent = wheelFrame
+Instance.new("UICorner", innerMask).CornerRadius = UDim.new(0.5, 0)
+local innerMaskStroke = Instance.new("UIStroke", innerMask)
+innerMaskStroke.Color = Color3.fromRGB(0, 0, 0)
+innerMaskStroke.Thickness = 2
+
+local sliceHighlights = {}
+local NORMAL_TRANSPARENCY = 1
+local HOVER_TRANSPARENCY = 0.55
+local SELECTED_TRANSPARENCY = 0.35
+local activeTweens = {}
 
 for i = 1, TOTAL_SLOTS do
     local sliceCenterDeg = ((i - 1) * SLICE_ANGLE) - 90
     
-    -- Frame em formato de "fatia" usando dois triângulos via EditableImage não disponível,
-    -- então usamos wedge retangular rotacionado a partir do centro
-    -- Wedge = retângulo do centro até a borda, rotacionado pra fatia i
+    -- Frame "cunha" retangular que parte do centro em direção à borda
+    -- Rotação faz ela "apontar" para a fatia i
     local wedge = Instance.new("Frame")
-    wedge.Name = "Highlight_" .. i
+    wedge.Name = "SliceHighlight_" .. i
     wedge.AnchorPoint = Vector2.new(0, 0.5)
     wedge.Position = UDim2.new(0.5, 0, 0.5, 0)
-    wedge.Size = UDim2.fromOffset(radiusTotal, math.rad(SLICE_ANGLE) * radiusTotal)
+    -- Altura = 2 * radius * tan(22.5°) ≈ 0.4142 * radius
+    -- Mas para cobrir a fatia inteira visualmente, uso a largura = radius e altura generosa
+    wedge.Size = UDim2.fromOffset(radiusTotal + 2, radiusTotal * 0.9)
     wedge.Rotation = sliceCenterDeg
-    wedge.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
-    wedge.BackgroundTransparency = 1
+    wedge.BackgroundColor3 = Color3.fromRGB(175, 175, 175)
+    wedge.BackgroundTransparency = NORMAL_TRANSPARENCY
     wedge.BorderSizePixel = 0
     wedge.ZIndex = 2
     wedge.Parent = highlightLayer
     
-    -- Gradiente cinza
+    -- Gradiente: escuro no centro → claro na borda (efeito da imagem)
     local grad = Instance.new("UIGradient")
     grad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 100, 100)),   -- centro (mais escuro)
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 220, 220)),  -- borda (mais claro)
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 90, 90)),      -- centro (mais escuro)
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(170, 170, 170)), -- meio
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 230, 230)),   -- borda (mais claro)
     })
-    grad.Rotation = 90  -- horizontal (centro → borda)
+    grad.Rotation = 0
     grad.Parent = wedge
     
     sliceHighlights[i] = wedge
 end
 
+-- Divisórias (linhas brancas entre fatias)
 for i = 1, TOTAL_SLOTS do
     local dividerAngleDeg = -90 + ((i - 1) * SLICE_ANGLE) - (SLICE_ANGLE / 2)
     local dividerAngleRad = math.rad(dividerAngleDeg)
@@ -1067,6 +1003,7 @@ for i = 1, TOTAL_SLOTS do
     line.Parent = wheelFrame
 end
 
+-- Slots (imagens dos emotes)
 for i = 1, TOTAL_SLOTS do
     local slotAngleDeg = ((i - 1) * SLICE_ANGLE) - 90
     local slotAngleRad = math.rad(slotAngleDeg)
@@ -1100,112 +1037,137 @@ for i = 1, TOTAL_SLOTS do
     slotText.ZIndex = 7
     slotText.Parent = slotButton
 
-    slotButton.MouseButton1Click:Connect(function()
-        local item = catalogItems[i]
-        if item then
-            selectedEmoteItem = item
-            centerText.Text = item.name or item.Name or "Emote"
-            cartridgeButton.Visible = true
-            LoadTrack(item.id or item.AssetId or item.Id)
-            mainContainer.Visible = false
-        end
-    end)
-
     slotButtons[i] = slotButton
     slotImages[i] = slotImg
     slotTexts[i] = slotText
 end
 
 -- ==========================================
--- HITBOX RADIAL + HOVER HIGHLIGHT
+-- HITBOX RADIAL + HOVER/DRAG
 -- ==========================================
-local currentHoverIndex = 0
-local isHovering = false
-local isDragging = false
+local hoveredSlot = nil
+local selectedSlot = nil
+local activeTouch = nil
 
-local function getSliceIndexFromPosition(absPos, wheelAbsPos, wheelAbsSize)
-    local center = wheelAbsPos + (wheelAbsSize / 2)
-    local dx = absPos.X - center.X
-    local dy = absPos.Y - center.Y
-    local distance = math.sqrt(dx * dx + dy * dy)
-    local radius = math.min(wheelAbsSize.X, wheelAbsSize.Y) * 0.5
-    if distance > radius then return 0 end
-    if distance < (radius * 0.18) then return 0 end  -- deadzone centro
-    local angle = math.deg(math.atan2(dy, dx))
-    local corrected = (angle + 90 + (SLICE_ANGLE / 2)) % 360
-    local index = math.floor(corrected / SLICE_ANGLE) + 1
-    if index < 1 then index = 1 end
-    if index > TOTAL_SLOTS then index = TOTAL_SLOTS end
-    return index
+local function GetRadialSlot(screenPosition)
+    local wheelPosition = wheelFrame.AbsolutePosition
+    local wheelSize = wheelFrame.AbsoluteSize
+
+    local center = Vector2.new(wheelSize.X / 2, wheelSize.Y / 2)
+    local localPosition = Vector2.new(screenPosition.X - wheelPosition.X, screenPosition.Y - wheelPosition.Y)
+
+    local delta = localPosition - center
+    local distance = delta.Magnitude
+
+    local outerR = math.min(wheelSize.X, wheelSize.Y) / 2
+    local innerR = outerR * CENTER_RATIO
+
+    if distance < innerR or distance > outerR then
+        return nil
+    end
+
+    local angle = math.deg(math.atan2(delta.Y, delta.X))
+    angle = (angle + 360) % 360
+
+    local adjustedAngle = (angle + 112.5) % 360
+    local slot = math.floor(adjustedAngle / 45) + 1
+    return slot
 end
 
-local function setHighlight(idx)
-    if currentHoverIndex == idx then return end
-    -- Apaga anterior
-    if currentHoverIndex > 0 and sliceHighlights[currentHoverIndex] then
-        TweenService:Create(sliceHighlights[currentHoverIndex], TweenInfo.new(0.12), {BackgroundTransparency = 1}):Play()
-    end
-    currentHoverIndex = idx
-    -- Acende novo
-    if idx > 0 and sliceHighlights[idx] then
-        TweenService:Create(sliceHighlights[idx], TweenInfo.new(0.12), {BackgroundTransparency = 0.5}):Play()
+local function UpdateSliceVisuals()
+    for i = 1, TOTAL_SLOTS do
+        local slice = sliceHighlights[i]
+        local targetTransparency = NORMAL_TRANSPARENCY
+
+        if i == selectedSlot then
+            targetTransparency = SELECTED_TRANSPARENCY
+        end
+        if i == hoveredSlot then
+            targetTransparency = math.min(targetTransparency, HOVER_TRANSPARENCY)
+        end
+
+        if activeTweens[i] then activeTweens[i]:Cancel() end
+        local tween = TweenService:Create(slice, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = targetTransparency
+        })
+        activeTweens[i] = tween
+        tween:Play()
     end
 end
 
-local radialHitbox = Instance.new("TextButton")
-radialHitbox.Name = "RadialHitbox"
-radialHitbox.Size = UDim2.fromOffset(WHEEL_SIZE, WHEEL_SIZE)
-radialHitbox.AnchorPoint = Vector2.new(0.5, 0.5)
-radialHitbox.Position = UDim2.new(0.5, 0, 0.5, 0)
-radialHitbox.BackgroundTransparency = 1
-radialHitbox.Text = ""
-radialHitbox.ZIndex = 8
-radialHitbox.Parent = wheelFrame
+local function SelectRadialSlot(slot)
+    if not slot then return end
+    selectedSlot = slot
+    UpdateSliceVisuals()
 
-radialHitbox.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        isDragging = true
-        local pos = Vector2.new(input.Position.X, input.Position.Y)
-        local idx = getSliceIndexFromPosition(pos, wheelFrame.AbsolutePosition, wheelFrame.AbsoluteSize)
-        setHighlight(idx)
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if not isDragging then return end
-    if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
-    local pos = Vector2.new(input.Position.X, input.Position.Y)
-    local idx = getSliceIndexFromPosition(pos, wheelFrame.AbsolutePosition, wheelFrame.AbsoluteSize)
-    setHighlight(idx)
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if not isDragging then return end
-    if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
-    isDragging = false
-    local pos = Vector2.new(input.Position.X, input.Position.Y)
-    local idx = getSliceIndexFromPosition(pos, wheelFrame.AbsolutePosition, wheelFrame.AbsoluteSize)
-    if idx > 0 and catalogItems[idx] then
-        local item = catalogItems[idx]
+    local item = catalogItems[slot]
+    if item then
         selectedEmoteItem = item
         centerText.Text = item.name or item.Name or "Emote"
         cartridgeButton.Visible = true
         LoadTrack(item.id or item.AssetId or item.Id)
         mainContainer.Visible = false
     end
-    setHighlight(0)
+end
+
+-- Detecção de mouse
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+    if not wheelFrame.Visible or not mainContainer.Visible then return end
+    if activeTouch then return end
+    local s = GetRadialSlot(input.Position)
+    if s ~= hoveredSlot then
+        hoveredSlot = s
+        UpdateSliceVisuals()
+    end
 end)
 
--- Hover (sem clicar) — mouse apenas
-if UserInputService.MouseEnabled then
-    UserInputService.InputChanged:Connect(function(input)
-        if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-        if isDragging then return end
-        local pos = Vector2.new(input.Position.X, input.Position.Y)
-        local idx = getSliceIndexFromPosition(pos, wheelFrame.AbsolutePosition, wheelFrame.AbsoluteSize)
-        setHighlight(idx)
-    end)
-end
+UserInputService.InputBegan:Connect(function(input)
+    if not wheelFrame.Visible or not mainContainer.Visible then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local s = GetRadialSlot(input.Position)
+        if s then SelectRadialSlot(s) end
+    elseif input.UserInputType == Enum.UserInputType.Touch then
+        activeTouch = input
+        local s = GetRadialSlot(input.Position)
+        if s then
+            hoveredSlot = s
+            UpdateSliceVisuals()
+        end
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not activeTouch then return end
+    if input.UserInputType ~= Enum.UserInputType.Touch then return end
+    local s = GetRadialSlot(input.Position)
+    if s ~= hoveredSlot then
+        hoveredSlot = s
+        UpdateSliceVisuals()
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input ~= activeTouch then return end
+    local s = GetRadialSlot(input.Position)
+    if s then SelectRadialSlot(s) end
+    activeTouch = nil
+    hoveredSlot = nil
+    UpdateSliceVisuals()
+end)
+
+-- Sair com mouse da roda → apaga hover
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+    if activeTouch then return end
+    if not wheelFrame.Visible or not mainContainer.Visible then return end
+    local s = GetRadialSlot(input.Position)
+    if s == nil and hoveredSlot ~= nil then
+        hoveredSlot = nil
+        UpdateSliceVisuals()
+    end
+end)
 
 local function updateWheelSlots()
     for i = 1, TOTAL_SLOTS do
@@ -1411,9 +1373,7 @@ buildCategoriesMenu = function()
         arrow.Parent = btn
 
         btn.MouseButton1Click:Connect(function()
-            if currentCategory == name and not isAll then
-                return
-            end
+            if currentCategory == name and not isAll then return end
             currentCategory = name
             currentPage = 1
             loadPage(currentPage)
