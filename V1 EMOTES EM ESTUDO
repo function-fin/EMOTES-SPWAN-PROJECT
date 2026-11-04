@@ -1,3 +1,17 @@
+--[[
+    Script: 7yd7 | Roda Radial de Emotes - VISUAL FINAL EXATO + MELHORIAS
+    - Design preto e branco (Arcade) com divisórias brancas
+    - Sistema Radial funcional com reset ao trocar de página
+    - Modal Salvar movido para a direita
+    - Categorias e Favoritos (Estrela) salvos em JSON persistente
+    - Favoritos aparecem no topo da lista
+    - Botão Externo: Reduzido em 15%, no topo central, esconde ao abrir e volta ao clicar fora.
+    - Múltiplos Emotes simultâneos (Sobreposição permitida)
+    - Ordem de Categoria preservada por fatia (página 1, 2, etc.)
+    - Sistema de Notificação (Toast) ao salvar emote.
+    - Ícone do sol brilha na categoria selecionada no modal.
+]]
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -123,6 +137,7 @@ local function smartSearchMatch(name, term)
     return true
 end
 
+-- Aplica busca e ordena os favoritos primeiro
 local function applySearchLocal(term)
     term = tostring(term or ""):lower()
     local out = {}
@@ -162,7 +177,7 @@ end
 RebuildIndex()
 
 --// STATE
-local ActiveTracks = {} -- Tabela para múltiplos emotes simultâneos
+local ActiveTracks = {} 
 local currentCategory = "All"
 local currentPage = 1
 local totalPages = DEFAULT_TOTAL_PAGES
@@ -174,7 +189,7 @@ local searchToken = 0
 
 local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
 
---// TRACK (Sobreposição de Emotes)
+--// TRACK (Múltiplos Emotes)
 local function LoadTrack(id)
     local animId
     local ok, result = pcall(function() return game:GetObjects("rbxassetid://" .. tostring(id)) end)
@@ -229,12 +244,10 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = parentTarget
 
---// BOTÃO EXTERNO (Tamanho reduzido em 15% e posicionado no topo central)
--- 53 * 0.85 = ~45
+--// BOTÃO EXTERNO
 local toggleButton = Instance.new("ImageButton")
 toggleButton.Size = UDim2.new(0, 45, 0, 45) 
 toggleButton.AnchorPoint = Vector2.new(0.5, 0.5)
--- Posicionado no topo central (0.5 em X, 0 em Y com margem de 40px)
 toggleButton.Position = UDim2.new(0.5, 0, 0, 40) 
 toggleButton.BackgroundTransparency = 1
 toggleButton.Image = ID_BTN_EXTERNO
@@ -263,7 +276,6 @@ mainContainer.BackgroundTransparency = 1
 mainContainer.Visible = false
 mainContainer.Parent = screenGui
 
--- Ação do Botão Externo: Some o botão, aparece a interface
 toggleButton.MouseButton1Click:Connect(function()
     mainContainer.Visible = true
     toggleButton.Visible = false
@@ -541,7 +553,60 @@ removeCatGlobalBtn.MouseButton1Click:Connect(function()
     buildCategoriesMenu(); loadPage(1)
 end)
 
---// MODAL SALVAR (Deslocado)
+--// SISTEMA DE NOTIFICAÇÃO (TOAST)
+local function ShowToast(catName)
+    local existing = screenGui:FindFirstChild("ToastNotification")
+    if existing then existing:Destroy() end
+
+    local toast = Instance.new("Frame")
+    toast.Name = "ToastNotification"
+    toast.Size = UDim2.fromOffset(280, 50)
+    toast.AnchorPoint = Vector2.new(1, 1)
+    toast.Position = UDim2.new(1, -MARGIN, 1, -MARGIN)
+    toast.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    toast.BorderSizePixel = 0
+    toast.ZIndex = 99
+    toast.Parent = screenGui
+    Instance.new("UICorner", toast).CornerRadius = UDim.new(0, 8)
+    
+    local stroke = Instance.new("UIStroke", toast)
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = 2
+
+    local txt = Instance.new("TextLabel")
+    txt.Size = UDim2.new(1, -20, 1, 0)
+    txt.Position = UDim2.new(0, 10, 0, 0)
+    txt.BackgroundTransparency = 1
+    txt.Text = "Emote Salvo com Sucesso Na\nCategoria ( " .. catName .. " )"
+    txt.TextColor3 = Color3.fromRGB(255, 255, 255)
+    txt.TextSize = 14
+    txt.Font = Enum.Font.Arcade
+    txt.TextWrapped = true
+    txt.TextXAlignment = Enum.TextXAlignment.Left
+    txt.ZIndex = 100
+    txt.Parent = toast
+
+    -- Animação de entrada
+    toast.Position = UDim2.new(1, -MARGIN, 1, MARGIN + 50)
+    TweenService:Create(toast, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Position = UDim2.new(1, -MARGIN, 1, -MARGIN)
+    }):Play()
+
+    -- Temporizador de 2 segundos
+    task.delay(2, function()
+        if toast and toast.Parent then
+            local fadeOut = TweenService:Create(toast, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Position = UDim2.new(1, -MARGIN, 1, MARGIN + 50)
+            })
+            fadeOut:Play()
+            fadeOut.Completed:Connect(function()
+                toast:Destroy()
+            end)
+        end
+    end)
+end
+
+--// MODAL SALVAR
 local saveModal = Instance.new("Frame")
 saveModal.Size = UDim2.fromOffset(336, 240)
 saveModal.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -605,8 +670,9 @@ openSaveModal = function()
         cs.Color = Color3.fromRGB(255, 255, 255); cs.Thickness = 1.8; cs.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
         local catSun = Instance.new("ImageLabel")
+        catSun.Name = "CatSun"
         catSun.Size = UDim2.fromOffset(17, 17); catSun.Position = UDim2.new(0, 12, 0.5, -8)
-        catSun.BackgroundTransparency = 1; catSun.Image = ID_ICONE_SOL; catSun.ZIndex = 12; catSun.Parent = catBtn
+        catSun.BackgroundTransparency = 1; catSun.Image = ID_ICONE_SOL; catSun.ImageColor3 = Color3.fromRGB(150,150,150); catSun.ZIndex = 12; catSun.Parent = catBtn
 
         local catText = Instance.new("TextLabel")
         catText.Size = UDim2.new(1, -60, 1, 0); catText.Position = UDim2.new(0, 38, 0, 0)
@@ -625,11 +691,15 @@ openSaveModal = function()
                     local s = b:FindFirstChildOfClass("UIStroke")
                     if s then s.Thickness = 1.8; s.Color = Color3.fromRGB(255, 255, 255) end
                     b.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                    local sun = b:FindFirstChild("CatSun")
+                    if sun then sun.ImageColor3 = Color3.fromRGB(150,150,150) end
                 end
             end
             catBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
             local s = catBtn:FindFirstChildOfClass("UIStroke")
             if s then s.Thickness = 2 end
+            local selectedSun = catBtn:FindFirstChild("CatSun")
+            if selectedSun then selectedSun.ImageColor3 = Color3.fromRGB(255,255,255) end -- Sol brilha ao selecionar
         end)
     end
     saveModal.Visible = true
@@ -670,6 +740,10 @@ saveConfirmBtn.MouseButton1Click:Connect(function()
         end
         SaveJSON(CATEGORIES_FILE, emoteData)
         saveModal.Visible = false; buildCategoriesMenu()
+        
+        -- DISPARA A NOTIFICAÇÃO AQUI
+ShowToast(targetCategoryToSave)
+
         if currentCategory == targetCategoryToSave then loadPage(1) end
     end
 end)
@@ -832,7 +906,7 @@ local function getSectorFromPosition(position)
     return angleToSector(math.deg(math.atan2(dy, dx)))
 end
 
---// SLOTS (Botões, Ícones e Estrelas)
+--// SLOTS
 for i = 1, TOTAL_SLOTS do
     local slotAngleDeg = ((i - 1) * SLICE_ANGLE) - 90
     local slotAngleRad = math.rad(slotAngleDeg)
@@ -905,7 +979,7 @@ for i = 1, TOTAL_SLOTS do
             cartridgeButton.Visible = true
             LoadTrack(item.id or item.AssetId or item.Id)
             mainContainer.Visible = false
-            toggleButton.Visible = true -- Retorna o botão externo ao clicar no emote
+            toggleButton.Visible = true 
         end
     end)
 
@@ -918,7 +992,6 @@ for i = 1, TOTAL_SLOTS do
     slotStars[i] = starBtn
 end
 
---// SISTEMA DE CLIQUE (FECHAR AO CLICAR FORA)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if not mainContainer.Visible then return end
@@ -978,7 +1051,6 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
---// UPDATE SLOTS VISUAL
 updateWheelSlots = function()
     for i = 1, TOTAL_SLOTS do
         local item = catalogItems[i]
@@ -1006,7 +1078,6 @@ updateWheelSlots = function()
     renderRadialState()
 end
 
---// LOADPAGE
 loadPage = function(targetPage)
     searchToken = searchToken + 1
     local myToken = searchToken
@@ -1024,10 +1095,33 @@ loadPage = function(targetPage)
             end
         end
         local filtered = {}
+        -- Mantém a ordem exata que os emotes foram salvos na categoria
         for _, e in ipairs(filteredEmotes) do
             local eid = tostring(e.id or e.AssetId or e.Id)
             if catSet[eid] then table.insert(filtered, e) end
         end
+        -- Na verdade, para categoria, a ordem deve vir da própria tabela da categoria
+        if currentCategory ~= "All" then
+            local catEmotesOrder = {}
+            for _, cat in ipairs(emoteData.categories) do
+                if cat.name == currentCategory then
+                    for _, entry in ipairs(cat.emotes) do
+                        local eid = type(entry) == "table" and tostring(entry.id or entry) or tostring(entry)
+                        local originalEmote = emoteIndexById[eid]
+                        if originalEmote then
+                            table.insert(catEmotesOrder, originalEmote)
+                        elseif type(entry) == "table" then
+                            table.insert(catEmotesOrder, {id = entry.id, name = entry.name})
+                        end
+                    end
+                    break
+                end
+            end
+            if #catEmotesOrder > 0 then
+                filtered = catEmotesOrder
+            end
+        end
+        
         filteredEmotes = filtered; localCount = #filteredEmotes
     end
 
@@ -1084,7 +1178,6 @@ searchBox.FocusLost:Connect(function()
     currentKeyword = searchBox.Text; currentPage = 1; loadPage(1)
 end)
 
---// BUILD CATEGORIES MENU
 buildCategoriesMenu = function()
     for _, child in ipairs(sideScrolling:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
 
@@ -1139,7 +1232,6 @@ buildCategoriesMenu = function()
     for _, cat in ipairs(emoteData.categories) do createCatBtn(cat.name, #cat.emotes, false) end
 end
 
---// TOGGLE (RightShift)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
@@ -1149,7 +1241,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
---// INIT
 local function mergeNoDupes(listA, listB)
     local seen, out = {}, {}
     for _, e in ipairs(listA) do local k = tostring(e.id); if not seen[k] then seen[k] = true; table.insert(out, e) end end
