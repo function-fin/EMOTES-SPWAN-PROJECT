@@ -5,7 +5,7 @@
     - Modal Salvar movido para a direita
     - Categorias e Favoritos (Estrela) salvos em JSON persistente
     - Favoritos aparecem no topo da lista
-    - Novos Ajustes: Botão externo oculta/retorna, tamanho reduzido, botão X para fechar tudo
+    - Correções: Botão X movido para o topo esquerdo (junto ao menu), botão externo posicionado corretamente e lógica de visibilidade ajustada
 ]]
 
 local Players = game:GetService("Players")
@@ -240,11 +240,11 @@ screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
 screenGui.Parent = parentTarget
 
---// BOTÃO EXTERNO (-10% tamanho)
+--// BOTÃO EXTERNO (-10% tamanho, posição correta)
 local toggleButton = Instance.new("ImageButton")
-toggleButton.Size = UDim2.new(0, 48, 0, 48) -- Reduzido de 53 para 48
+toggleButton.Size = UDim2.new(0, 48, 0, 48)
 toggleButton.AnchorPoint = Vector2.new(0.5, 0.5)
-toggleButton.Position = UDim2.new(1, -MARGIN - 24, 1, -MARGIN - 24)
+toggleButton.Position = UDim2.new(1, -40, 1, -40) -- Canto inferior direito
 toggleButton.BackgroundTransparency = 1
 toggleButton.Image = ID_BTN_EXTERNO
 toggleButton.Parent = screenGui
@@ -272,7 +272,7 @@ mainContainer.BackgroundTransparency = 1
 mainContainer.Visible = false
 mainContainer.Parent = screenGui
 
--- Lógica do botão externo: Some ao abrir
+-- Lógica do botão externo: Some ao abrir a interface
 toggleButton.MouseButton1Click:Connect(function() 
     mainContainer.Visible = true 
     toggleButton.Visible = false
@@ -295,10 +295,24 @@ topBar.Position = UDim2.new(0.5, 0, 0, -MARGIN)
 topBar.BackgroundTransparency = 1
 topBar.Parent = wheelFrame
 
+-- BOTÃO X (Fechar tudo) - Movido para o lado esquerdo
+local closeAllButton = Instance.new("ImageButton")
+closeAllButton.Size = UDim2.fromOffset(38, 38)
+closeAllButton.AnchorPoint = Vector2.new(0, 0.5)
+closeAllButton.Position = UDim2.new(0, 0, 0.5, 0) -- Onde ficava o docButton
+closeAllButton.BackgroundTransparency = 1
+closeAllButton.Image = "rbxassetid://" .. ID_FECHAR_X
+closeAllButton.Parent = topBar
+
+closeAllButton.MouseButton1Click:Connect(function()
+    screenGui:Destroy() -- Fecha o script completamente
+end)
+
+-- BOTÃO CATEGORIAS (Documento) - Movido para o lado do X
 local docButton = Instance.new("ImageButton")
 docButton.Size = UDim2.fromOffset(38, 38)
 docButton.AnchorPoint = Vector2.new(0, 0.5)
-docButton.Position = UDim2.new(0, 0, 0.5, 0)
+docButton.Position = UDim2.new(0, 44, 0.5, 0) -- Ao lado do botão X
 docButton.BackgroundTransparency = 1
 docButton.Image = ID_BTN_DOCUMENTO
 docButton.Parent = topBar
@@ -306,7 +320,7 @@ docButton.Parent = topBar
 local searchContainer = Instance.new("Frame")
 searchContainer.Size = UDim2.fromOffset(276, 36)
 searchContainer.AnchorPoint = Vector2.new(0, 0.5)
-searchContainer.Position = UDim2.new(0, 48, 0.5, 0)
+searchContainer.Position = UDim2.new(0, 88, 0.5, 0) -- Empurrado para a direita por causa dos botões
 searchContainer.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 searchContainer.Parent = topBar
 Instance.new("UICorner", searchContainer).CornerRadius = UDim.new(0, 18)
@@ -328,30 +342,16 @@ searchBox.ClearTextOnFocus = false
 searchBox.TextXAlignment = Enum.TextXAlignment.Center
 searchBox.Parent = searchContainer
 
--- BOTÃO CARTUCHO (Salvar Modal)
+-- BOTÃO CARTUCHO (Salvar Modal) - Na direita
 local cartridgeButton = Instance.new("ImageButton")
 cartridgeButton.Size = UDim2.fromOffset(38, 38)
 cartridgeButton.AnchorPoint = Vector2.new(1, 0.5)
--- Movido mais para a esquerda para dar espaço ao botão X
-cartridgeButton.Position = UDim2.new(1, -44, 0.5, 0)
+cartridgeButton.Position = UDim2.new(1, 0, 0.5, 0)
 cartridgeButton.BackgroundTransparency = 1
 cartridgeButton.Image = ID_CARTUCHO_SEMBORDA
 cartridgeButton.Visible = false
 cartridgeButton.Parent = topBar
 cartridgeButton.MouseButton1Click:Connect(function() if selectedEmoteItem then openSaveModal() end end)
-
--- NOVO: BOTÃO FECHAR TUDO (X)
-local closeAllButton = Instance.new("ImageButton")
-closeAllButton.Size = UDim2.fromOffset(38, 38)
-closeAllButton.AnchorPoint = Vector2.new(1, 0.5)
-closeAllButton.Position = UDim2.new(1, 0, 0.5, 0)
-closeAllButton.BackgroundTransparency = 1
-closeAllButton.Image = "rbxassetid://" .. ID_FECHAR_X
-closeAllButton.Parent = topBar
-
-closeAllButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy() -- Destrói o script da tela inteira
-end)
 
 --// BARRA INFERIOR
 local navContainer = Instance.new("Frame")
